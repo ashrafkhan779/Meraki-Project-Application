@@ -114,7 +114,7 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
 .grid{display:grid;gap:14px}
 .g12{grid-template-columns:repeat(12,minmax(0,1fr))}
 .c4{grid-column:span 4}.c5{grid-column:span 5}.c6{grid-column:span 6}.c7{grid-column:span 7}.c8{grid-column:span 8}.c12{grid-column:span 12}
-.kpi-groups{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.kpi-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}
 .kgroup{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px 6px;box-shadow:var(--shadow)}
 .kgroup>h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-bottom:4px;font-family:var(--f-body);display:flex;align-items:center;gap:6px}
 .kpi{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--rule);text-decoration:none;color:inherit;border-radius:4px}
@@ -343,6 +343,10 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 
 @media (max-width:560px){.filters>*{max-width:100%}.filters select,.filters input[type=date]{flex:1 1 130px;min-width:0}}
 
+.with-add{display:flex;gap:6px;min-width:0}.with-add select{flex:1;min-width:0}.with-add .btn{height:34px;flex:none}
+
+@media (min-width:1800px){.kpi-groups{grid-template-columns:repeat(6,minmax(0,1fr))}}
+
 </style>
 </head>
 <body>
@@ -484,7 +488,7 @@ const INVOICE_STATUSES = ['Uninvoiced', 'Unpaid', 'Partially Paid', 'Paid'];
 const PERMS = [
   ['viewOverview', 'View Overview tab', 'Tabs'], ['viewJobs', 'View Jobs tab', 'Tabs'], ['viewRoster', 'View Roster tab', 'Tabs'],
   ['viewMaster', 'View Master Data tab', 'Tabs'], ['viewReports', 'View Reports tab', 'Tabs'], ['viewSettings', 'View Settings tab', 'Tabs'],
-  ['jobCreate', 'Create jobs', 'Jobs'], ['jobEdit', 'Edit jobs', 'Jobs'], ['jobDelete', 'Archive (delete) jobs', 'Jobs'],
+  ['jobCreate', 'Create jobs', 'Jobs'], ['quickAddMaster', 'Quick-add companies, end-clients & engineers from the job form', 'Jobs'], ['jobEdit', 'Edit jobs', 'Jobs'], ['jobDelete', 'Archive (delete) jobs', 'Jobs'],
   ['viewFinancials', 'View financial data', 'Finance'], ['editFinancials', 'Edit financial data (PO values)', 'Finance'],
   ['viewCostRates', 'View employee cost rates', 'Finance'],
   ['manageManpower', 'Manage manpower costs', 'Costing'], ['manageMaterials', 'Manage materials & transfers', 'Costing'],
@@ -574,7 +578,7 @@ const Store = {
       APP.db = await r.json(); APP.source = 'data.json';
       Store.normalize(); Store.persist();
     }
-    Store.normalize();
+    if (Store.normalize()) Store.persist();
     let uidSaved = null; try { uidSaved = localStorage.getItem(USER_KEY); } catch (e) { }
     APP.user = APP.db.users.find(u => u.id === uidSaved && u.active) || APP.db.users.find(u => u.active && roleOf(u)?.permissions.manageUsers) || APP.db.users.find(u => u.active);
   },
@@ -582,6 +586,16 @@ const Store = {
     const d = APP.db; ALL_TABLES.forEach(t => { if (!Array.isArray(d[t])) d[t] = []; });
     d.meta = d.meta || { schemaVersion: 1 }; d.settings = d.settings || {};
     d.settings.jobNumber = d.settings.jobNumber || { prefix: 'JOB', pattern: '{PREFIX}-{TYPE}-{YYYY}-{SEQ}', padding: 4, nextSeq: 1, typeCodes: { Service: 'SRV', Supply: 'SUP', 'Supply/Services': 'SSV' } };
+    d.roles.forEach(r => { if (r.permissions && !('quickAddMaster' in r.permissions)) r.permissions.quickAddMaster = !!r.permissions.jobCreate; });
+    let migrated = false;
+    if ((d.meta.schemaVersion || 1) < 2) { // v2: manpower lines = headcount × hours per person per day × days × rate (cost preserved)
+      for (const t of ['plannedManpower', 'actualManpower']) for (const l of d[t]) {
+        if (isNum(l.days)) continue; const days = autoDays(t === 'plannedManpower' ? l.startDate : l.dateFrom, t === 'plannedManpower' ? l.endDate : l.dateTo) || 1;
+        l.hoursPerPerson = Math.round(num(l.hoursPerPerson) / days * 10000) / 10000; l.days = days;
+      }
+      d.meta.schemaVersion = 2; migrated = true;
+    }
+    return migrated;
   },
   persist() {
     APP.db.meta.savedAt = nowISO(); APP.rev++; APP.cache = {};
@@ -623,8 +637,9 @@ function idx() {
 }
 const L = (jobId, t) => (idx().byJob[jobId] || {})[t] || [];
 const Calc = {
-  mp: l => r2(num(l.headcount) * num(l.hoursPerPerson) * num(l.rate)),
-  mpHours: l => num(l.headcount) * num(l.hoursPerPerson),
+  days: l => isNum(l.days) && +l.days > 0 ? +l.days : 1,
+  mp: l => r2(num(l.headcount) * num(l.hoursPerPerson) * Calc.days(l) * num(l.rate)),
+  mpHours: l => num(l.headcount) * num(l.hoursPerPerson) * Calc.days(l),
   qty: l => r2(num(l.qty) * num(l.unitPrice)),
   tr: l => r2(num(l.qty) * num(l.unitCost)),
   miscPaid: m => r2(sum(idx().payByMisc[m.id] || [], p => r2(p.amount))),
@@ -734,6 +749,12 @@ function nextJobNo(type, dateISO) {
 
 /* ---------------- roster load engine ---------------- */
 const isWorkDay = iso => (APP.db.settings.workingDays || [1, 2, 3, 4, 5]).includes(dow(iso));
+/** default day count for a date range: working days per the Settings calendar; a range with no working days counts calendar days */
+function autoDays(from, to) {
+  if (!from) return null; to = to && to >= from ? to : from; let wd = 0, cd = 0;
+  for (let d = from; d <= to && cd < 1000; d = addDays(d, 1)) { cd++; if (isWorkDay(d)) wd++; }
+  return wd || cd;
+}
 function capacityOf(emp) { return emp.type === 'outsourced' ? num(emp.capacityPct || 100) : 100; }
 function onLeave(empId, iso) { return (idx().leaveByEmp[empId] || []).find(l => l.fromDate <= iso && l.toDate >= iso); }
 function loadOn(empId, iso, excludeId) {
@@ -882,6 +903,9 @@ const API = {
       vNum(d, 'rate', 'Hourly rate', { min: 0, req: true }, e);
       if (t === 'plannedManpower') { vDate(d, 'startDate', 'Start date', false, e); vDate(d, 'endDate', 'End date', false, e); vOrder(d, 'startDate', 'endDate', 'Start', 'End', e); }
       else { vDate(d, 'dateFrom', 'Work date', true, e); vDate(d, 'dateTo', 'Work date to', false, e); vOrder(d, 'dateFrom', 'dateTo', 'From', 'To', e); }
+      vNum(d, 'days', 'Days', { min: 0 }, e);
+      if (d.days === 0) e.days = 'Days must be greater than 0';
+      if (d.days == null && !e.days) d.days = (t === 'plannedManpower' ? autoDays(d.startDate, d.endDate) : autoDays(d.dateFrom, d.dateTo)) || 1;
     } else if (t === 'plannedMaterials' || t === 'actualMaterials') {
       vReq(d, 'description', 'Material description', e); vNum(d, 'qty', 'Quantity', { min: 0, req: true }, e); vNum(d, 'unitPrice', 'Unit price', { min: 0, req: true }, e);
       vDate(d, t === 'plannedMaterials' ? 'expectedDate' : 'purchaseDate', 'Date', t === 'actualMaterials', e);
@@ -1060,7 +1084,8 @@ const API = {
   _syncPlan(a, emp) { // single source of truth: the assignment drives its linked planned-manpower line
     let line = APP.db.plannedManpower.find(l => l.assignmentId === a.id && !l.archived);
     if (a.status === 'Cancelled') { if (line) { line.archived = true; stampUpd(line); } return; }
-    const vals = { jobId: a.jobId, employeeId: emp.id, resourceName: emp.name, resourceType: emp.type, supplierId: emp.type === 'outsourced' ? emp.supplierId : null, headcount: 1, hoursPerPerson: a.plannedHours, startDate: a.startDate, endDate: a.endDate, comments: 'From roster' + (a.comments ? ': ' + a.comments : '') };
+    const days = autoDays(a.startDate, a.endDate) || 1;
+    const vals = { jobId: a.jobId, employeeId: emp.id, resourceName: emp.name, resourceType: emp.type, supplierId: emp.type === 'outsourced' ? emp.supplierId : null, headcount: 1, hoursPerPerson: Math.round(num(a.plannedHours) / days * 10000) / 10000, days, startDate: a.startDate, endDate: a.endDate, comments: 'From roster' + (a.comments ? ': ' + a.comments : '') };
     if (line) { Object.assign(line, vals); stampUpd(line); }
     else { line = stampNew({ id: uid('pmp'), ...vals, rate: API.empRate(emp), assignmentId: a.id }); APP.db.plannedManpower.push(line); }
   },
@@ -1075,7 +1100,7 @@ const API = {
     return tx(() => {
       const b = clone(a); a.status = 'Completed'; a.actualHours = d.actualHours; a.endDate = d.dateTo < a.startDate ? a.startDate : d.dateTo; stampUpd(a);
       const emp = get('employees', a.employeeId); API._syncPlan(a, emp);
-      if (d.actualHours > 0) { if (!can('manageManpower')) deny('Posting actual hours requires “Manage manpower”.'); const line = stampNew({ id: uid('amp'), jobId: a.jobId, employeeId: emp.id, resourceName: emp.name, resourceType: emp.type, supplierId: emp.type === 'outsourced' ? emp.supplierId : null, headcount: 1, hoursPerPerson: d.actualHours, rate: API.empRate(emp), dateFrom: a.startDate, dateTo: a.endDate, comments: 'From roster completion', assignmentId: a.id }); APP.db.actualManpower.push(line); }
+      if (d.actualHours > 0) { if (!can('manageManpower')) deny('Posting actual hours requires “Manage manpower”.'); const line = stampNew({ id: uid('amp'), jobId: a.jobId, employeeId: emp.id, resourceName: emp.name, resourceType: emp.type, supplierId: emp.type === 'outsourced' ? emp.supplierId : null, headcount: 1, hoursPerPerson: Math.round(d.actualHours / (autoDays(a.startDate, a.endDate) || 1) * 10000) / 10000, days: autoDays(a.startDate, a.endDate) || 1, rate: API.empRate(emp), dateFrom: a.startDate, dateTo: a.endDate, comments: 'From roster completion', assignmentId: a.id }); APP.db.actualManpower.push(line); }
       audit('complete', 'assignments', id, b, a, null, job.id);
     });
   },
@@ -1086,8 +1111,9 @@ const API = {
   deleteLeave(id) { if (!(can('rosterAssign') || can('manageMaster'))) deny(); const r = get('leaves', id); return tx(() => { r.archived = true; stampUpd(r); audit('delete', 'leaves', id, r, null); }); },
 
   /* ---------- master data ---------- */
-  saveMaster(t, d, version) {
-    need('manageMaster');
+  saveMaster(t, d, version, opts = {}) {
+    const quick = opts.quick && !d.id && ['customers', 'endClients', 'employees'].includes(t) && can('quickAddMaster');
+    if (!quick) need('manageMaster'); else if (!APP.user?.active) deny();
     const e = {}; vReq(d, 'name', 'Name', e);
     const codeKey = t === 'inventoryItems' ? 'sku' : 'code'; vReq(d, codeKey, 'Code', e);
     if (d[codeKey] && APP.db[t].some(r => r.id !== d.id && !r.archived && String(r[codeKey]).toLowerCase() === String(d[codeKey]).trim().toLowerCase())) e[codeKey] = 'Code already in use';
@@ -1313,6 +1339,7 @@ function fieldHTML(f, v) {
   else if (f.type === 'multi') input = `<select id="${id}" name="${f.k}" multiple size="${Math.min(5, f.options.length)}" style="height:auto;padding:4px"${ro}>${f.options.map(([val, l]) => `<option value="${esc(val)}" ${(v || []).includes(val) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   else if (f.type === 'textarea') input = `<textarea id="${id}" name="${f.k}" rows="${f.rows || 3}"${ro} ${f.max ? `maxlength="${f.max}"` : ''}>${esc(v ?? '')}</textarea>`;
   else input = `<input id="${id}" name="${f.k}" type="${f.type || 'text'}" value="${esc(v ?? '')}" ${f.step ? `step="${f.step}"` : (f.type === 'number' ? 'step="any"' : '')} ${f.min != null ? `min="${f.min}"` : ''} ${f.maxv != null ? `max="${f.maxv}"` : ''} ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ''} ${f.req ? 'required' : ''} ${f.type === 'number' ? 'inputmode="decimal"' : ''}${ro} autocomplete="off">`;
+  if (f.add && !f.readonly) input = `<div class="with-add">${input}<button type="button" class="btn sm" data-act="quickAdd" data-kind="${f.add}" data-field="${f.k}" aria-label="Create new ${esc(f.label)}" title="Not in the list? Create it here">${ic('plus', 'sm')}New</button></div>`;
   return `<div class="${cls}"><label for="${id}" style="display:contents"><span>${esc(f.label)}${req}</span></label>${input}${hint}</div>`;
 }
 const formGrid = (fields, vals = {}) => `<div class="form-grid">${fields.filter(f => !f.hidden).map(f => fieldHTML(f, vals[f.k])).join('')}</div>`;
@@ -1526,10 +1553,51 @@ function rosterToday() {
   return { total: emps.length, cap, booked, util: cap ? booked / cap * 100 : null, assigned, available, leave };
 }
 
+/* ---------------- period filter: year / quarter / month (fiscal-year aware) ---------------- */
+const fyStart = () => +(APP.db.settings.fiscalYearStartMonth || 1);
+const fyOf = iso => { const y = +iso.slice(0, 4), m = +iso.slice(5, 7); return m >= fyStart() ? y : y - 1; };
+const fyLabel = y => fyStart() === 1 ? String(y) : `FY ${y}/${String((y + 1) % 100).padStart(2, '0')}`;
+const absToKey = a => `${Math.floor(a / 12)}-${String(a % 12 + 1).padStart(2, '0')}`;
+const lastDay = key => { const [y, m] = key.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+function periodMonths(f) { // absolute month indices covered by year (+quarter)
+  if (!f.year) return [];
+  const s0 = (+f.year) * 12 + fyStart() - 1; const a = f.q ? s0 + (f.q - 1) * 3 : s0; const n = f.q ? 3 : 12;
+  return Array.from({ length: n }, (_, i) => a + i);
+}
+function periodRange(f) {
+  if (!f.year) return { from: '', to: '', label: 'All periods' };
+  if (f.m) return { from: f.m + '-01', to: lastDay(f.m), label: monthLabel(f.m) };
+  const M = periodMonths(f); const a = absToKey(M[0]), b = absToKey(M[M.length - 1]);
+  return { from: a + '-01', to: lastDay(b), label: (f.q ? `Q${f.q} ` : '') + fyLabel(+f.year) };
+}
+function quarterLabel(q) { const a = (fyStart() - 1 + (q - 1) * 3) % 12; return `Q${q} (${MON[a]}–${MON[(a + 2) % 12]})`; }
+/* ---------------- billing pipeline: unbilled PO value expected in the next 3 months ---------------- */
+function billMonths() { const t = todayISO(); const a = (+t.slice(0, 4)) * 12 + (+t.slice(5, 7)) - 1; return [a, a + 1, a + 2].map(absToKey); }
+/** bucket for a job's unbilled value: 'ready' (completed/closed, not fully billed), 'YYYY-MM' (planned finish in next 3 months), 'late' (planned finish already passed), or null */
+function billBucket(j) {
+  if (j.archived || j.status === 'Cancelled') return null;
+  const x = Calc.job(j); if (x.actualPO - x.invoiced <= 0.005) return null;
+  if (['Completed', 'Closed'].includes(j.status)) return 'ready';
+  if (!j.pfDate) return null;
+  const M = billMonths(); const k = monthKey(j.pfDate);
+  if (k < M[0]) return 'late'; return M.includes(k) ? k : null;
+}
+function billingPipeline(f) {
+  const out = { ready: 0, late: 0, months: Object.fromEntries(billMonths().map(m => [m, 0])), jobs: 0, total: 0 };
+  for (const j of APP.db.jobs) {
+    if (!canType(j.type) || (f.type && j.type !== f.type) || (f.cust && j.customerId !== f.cust)) continue;
+    const b = billBucket(j); if (!b) continue; const x = Calc.job(j); const v = r2(x.actualPO - x.invoiced);
+    if (b === 'ready') out.ready = r2(out.ready + v); else if (b === 'late') out.late = r2(out.late + v); else out.months[b] = r2(out.months[b] + v);
+    out.jobs++; out.total = r2(out.total + v);
+  }
+  return out;
+}
+
 VIEWS.overview = (root, r) => {
   setCrumbs([['Overview', '#/overview']]);
-  const f = vs('ov', { from: '', to: '', type: '', cust: '', status: '' });
-  const jobs = scopedJobs(f); const finJobs = jobs.filter(j => j.status !== 'Cancelled');
+  const f = vs('ov', { year: '', q: '', m: '', type: '', cust: '', status: '' });
+  const P = periodRange(f); const BP = billingPipeline(f);
+  const jobs = scopedJobs({ ...f, from: P.from, to: P.to }); const finJobs = jobs.filter(j => j.status !== 'Cancelled');
   const F = finJobs.map(j => [j, Calc.job(j)]);
   const tot = k => r2(sum(F, ([, x]) => x[k]));
   const cnt = s => jobs.filter(j => j.status === s).length;
@@ -1543,7 +1611,7 @@ VIEWS.overview = (root, r) => {
   const done = F.filter(([j]) => ['Completed', 'Closed'].includes(j.status));
   const dPO = r2(sum(done, ([, x]) => x.actualPO)), dGP = r2(sum(done, ([, x]) => x.actualGP)), dPPO = r2(sum(done, ([, x]) => x.plannedPO)), dPGP = r2(sum(done, ([, x]) => x.plannedGP));
   const overBudget = done.filter(([, x]) => x.costVariance > 0.005).length;
-  const fq = (o) => qs({ from: f.from, to: f.to, cust: f.cust, ...o });
+  const fq = (o) => qs({ from: P.from, to: P.to, cust: f.cust, ...o });
   const jl = (o, slug) => `#/jobs/${slug || (f.type ? TYPE_SLUG[f.type] : 'all')}${fq(o)}`;
   const fin = can('viewFinancials');
   const mk = v => can('viewFinancials') ? `<span title="${esc(moneyTxt(v))}">${esc(APP.db.settings.currency)} ${compact(v)}</span>` : money(0);
@@ -1552,12 +1620,14 @@ VIEWS.overview = (root, r) => {
 
   root.innerHTML = `
   <div class="page-head">
-    <div class="t"><h1>Operations overview</h1><p>${jobs.length} jobs in scope · financials exclude cancelled jobs · ${esc(APP.db.settings.currency)} · as of ${fmtDate(t)}</p></div>
+    <div class="t"><h1>Operations overview</h1><p>${esc(P.label)} · ${jobs.length} jobs opened in period · financials exclude cancelled jobs · ${esc(APP.db.settings.currency)} · as of ${fmtDate(t)}</p></div>
     <div class="actions">${can('jobCreate') ? `<a class="btn primary" href="#/jobs/${f.type ? TYPE_SLUG[f.type] : 'service'}/new">${ic('plus', 'sm')}Create job</a>` : ''}</div>
   </div>
   <div class="filters" role="group" aria-label="Overview filters">
-    <span class="lbl">Opened</span>
-    <input type="date" aria-label="From date" value="${f.from}" data-chg="ovf" data-k="from"><span class="muted">to</span><input type="date" aria-label="To date" value="${f.to}" data-chg="ovf" data-k="to">
+    <span class="lbl" title="Jobs are placed in the period by their opening date">Period</span>
+    <select aria-label="Year" data-chg="ovp" data-k="year">${opt([...new Set([fyOf(t), ...APP.db.jobs.filter(j => !j.archived).map(j => fyOf(j.openingDate))])].sort((a, b) => b - a).map(y => [String(y), fyLabel(y)]), f.year, 'All years')}</select>
+    <select aria-label="Quarter" data-chg="ovp" data-k="q" ${f.year ? '' : 'disabled title="Choose a year first"'}>${opt([1, 2, 3, 4].map(q => [String(q), quarterLabel(q)]), f.q, 'All quarters')}</select>
+    <select aria-label="Month" data-chg="ovp" data-k="m" ${f.year ? '' : 'disabled title="Choose a year first"'}>${opt(periodMonths(f).map(a => [absToKey(a), monthLabel(absToKey(a))]), f.m, 'All months')}</select>
     <div class="seg" role="group" aria-label="Job type">${['', ...JOB_TYPES].map(x => `<button aria-pressed="${f.type === x}" data-act="ovType" data-v="${esc(x)}">${x || 'All types'}</button>`).join('')}</div>
     <select aria-label="Customer" data-chg="ovf" data-k="cust">${opt(custs.map(c => [c.id, c.name]), f.cust, 'All customers')}</select>
     <select aria-label="Project status" data-chg="ovf" data-k="status">${opt(APP.db.settings.jobStatuses, f.status, 'All statuses')}</select>
@@ -1591,6 +1661,12 @@ VIEWS.overview = (root, r) => {
     <div class="kgroup"><h3>${ic('users', 'sm')}Manpower · today</h3>
       ${kpi('Utilisation', RT.util == null ? 'N/A' : pct(RT.util, 0), '#/roster', 'booked ÷ capacity, excl. leave', 1)}
       ${kpi('Available employees', RT.available, '#/roster?avail=1', 'some capacity left')}${kpi('Currently assigned', RT.assigned, '#/roster?assigned=1')}${kpi('On leave', RT.leave, '#/roster')}</div>
+    ${fin ? `<div class="kgroup" title="Unbilled PO value (actual PO − invoiced) of jobs that are completed but not fully invoiced, or whose planned finish (PF) date falls in the next 3 months. Cancelled jobs excluded. Ignores the period filter.">
+      <h3>${ic('invoice', 'sm')}To bill · next 3 months</h3>
+      ${kpi('Planned to bill', mk(BP.total), `#/jobs/${f.type ? TYPE_SLUG[f.type] : 'all'}${qs({ bill: 'next3', cust: f.cust })}`, `${BP.jobs} job${BP.jobs === 1 ? '' : 's'} · unbilled PO`, 1)}
+      ${kpi('Completed, not billed', mk(BP.ready), `#/jobs/all${qs({ bill: 'ready', cust: f.cust })}`, 'bill now')}
+      ${Object.entries(BP.months).map(([m, v]) => kpi(monthLabel(m), mk(v), `#/jobs/all${qs({ bill: m, cust: f.cust })}`, 'by planned finish')).join('')}
+      ${BP.late ? kpi('Past PF date', mk(BP.late), `#/jobs/all${qs({ bill: 'late', cust: f.cust })}`, 'not yet completed') : ''}</div>` : ''}
   </section>
 
   <div class="grid g12">
@@ -1608,11 +1684,11 @@ VIEWS.overview = (root, r) => {
     drill: it => jl({ status: it.s }),
   })}</div></section>
     ${chartCard('c6', 'Monthly job creation', 'by job type · opening date', () => {
-    const M = monthsRange(f.from, f.to); const cols = ['var(--c1)', 'var(--c3)', 'var(--c4)'];
+    const M = monthsRange(P.from, P.to); const cols = ['var(--c1)', 'var(--c3)', 'var(--c4)'];
     return barChart({ label: 'Jobs created per month by type', cats: M.map(monthLabel), stacked: true, fmt: v => v.toFixed(0), series: JOB_TYPES.filter(x => !f.type || x === f.type).map((ty, k) => ({ name: ty, color: cols[JOB_TYPES.indexOf(ty)], values: M.map(m => jobs.filter(j => j.type === ty && monthKey(j.openingDate) === m).length), tip: v => `${v} job(s)` })), drill: (i, k) => `#/jobs/${TYPE_SLUG[JOB_TYPES.filter(x => !f.type || x === f.type)[k]]}${fq({ month: M[i] })}` });
   })}
     ${fin ? chartCard('c6', 'PO value vs actual cost', 'by opening month', () => {
-    const M = monthsRange(f.from, f.to); const g = (m, k) => r2(sum(F.filter(([j]) => monthKey(j.openingDate) === m), ([, x]) => x[k]));
+    const M = monthsRange(P.from, P.to); const g = (m, k) => r2(sum(F.filter(([j]) => monthKey(j.openingDate) === m), ([, x]) => x[k]));
     return barChart({ label: 'PO value versus actual cost per month', cats: M.map(monthLabel), series: [{ name: 'Actual PO value', color: 'var(--c1)', values: M.map(m => g(m, 'actualPO')), tip: v => moneyTxt(v, 0) }, { name: 'Actual cost', color: 'var(--c5)', values: M.map(m => g(m, 'actualCost')), tip: v => moneyTxt(v, 0) }], lines: [{ name: 'Planned cost', color: 'var(--c4)', dash: true, values: M.map(m => g(m, 'plannedCost')) }] });
   }) : ''}
     ${fin ? chartCard('c6', 'Performance by job type', 'planned vs actual GP', () => {
@@ -1621,7 +1697,7 @@ VIEWS.overview = (root, r) => {
       + `<div class="tbl-wrap" style="margin-top:8px;border-top:0"><table class="dt"><thead><tr><th>Type</th><th class="r">Jobs</th><th class="r">Plan GP%</th><th class="r">Actual GP%</th></tr></thead><tbody>${types.map(ty => { const po = g(ty, 'plannedPO'), apo = g(ty, 'actualPO'); return `<tr><td>${ty}</td><td class="r">${F.filter(([j]) => j.type === ty).length}</td><td class="r">${pct(po > 0 ? g(ty, 'plannedGP') / po * 100 : null)}</td><td class="r">${pct(apo > 0 ? g(ty, 'actualGP') / apo * 100 : null)}</td></tr>`; }).join('')}</tbody></table></div>`;
   }) : ''}
     ${fin ? chartCard('c6', 'Monthly invoicing & collections', 'invoice date vs payment date', () => {
-    const M = monthsRange(f.from, f.to); const pays = inv.flatMap(i => idx().payByInv[i.id] || []);
+    const M = monthsRange(P.from, P.to); const pays = inv.flatMap(i => idx().payByInv[i.id] || []);
     return barChart({ label: 'Invoiced and collected per month', cats: M.map(monthLabel), series: [{ name: 'Invoiced', color: 'var(--c1)', values: M.map(m => r2(sum(inv.filter(i => monthKey(i.invoiceDate) === m), i => r2(i.amount)))), tip: v => moneyTxt(v, 0) }, { name: 'Collected', color: 'var(--c3)', values: M.map(m => r2(sum(pays.filter(p => monthKey(p.payDate) === m), p => r2(p.amount)))), tip: v => moneyTxt(v, 0) }], drill: () => '#/reports/receivables' });
   }) : ''}
     ${fin ? chartCard('c4', 'Cost breakdown', 'planned vs actual', () => {
@@ -1656,13 +1732,14 @@ function attentionTable(F, t) {
   }) + (rows.length > 8 ? `<div class="pager">${rows.length - 8} more · <a href="#/reports/pva">Planned vs actual report</a></div>` : '');
 }
 CHG.ovf = el => { vs('ov', {})[el.dataset.k] = el.value; rerender(); };
+CHG.ovp = el => { const f = VS.ov; const k = el.dataset.k; f[k] = el.value; if (k === 'year') { f.q = ''; f.m = ''; } if (k === 'q' && f.m && !periodMonths(f).map(absToKey).includes(f.m)) f.m = ''; rerender(); };
 ACT.ovType = el => { VS.ov.type = el.dataset.v; rerender(); };
-ACT.ovReset = () => { VS.ov = { from: '', to: '', type: '', cust: '', status: '' }; rerender(); };
+ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', type: '', cust: '', status: '' }; rerender(); };
 
 /* =====================================================================
    Jobs — lists, create/edit form, job detail with costing tabs
    ===================================================================== */
-const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '' };
+const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '' };
 const empOpts = (ids = []) => { const list = APP.db.employees.filter(e => !e.archived && (e.status === 'Active' || ids.includes(e.id))); return list.sort(by('name', 1)).map(e => [e.id, `${e.name} · ${e.title || ''}${e.status !== 'Active' ? ' (inactive)' : ''}${e.type === 'outsourced' ? ' (outsourced)' : ''}`]); };
 const supOpts = (cur) => live('suppliers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
 const custOpts = (cur) => live('customers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
@@ -1679,6 +1756,7 @@ function filterJobs(type, s) {
     && (!s.from || j.openingDate >= s.from) && (!s.to || j.openingDate <= s.to) && (!s.month || monthKey(j.openingDate) === s.month)
     && (!s.inv || (s.inv === 'open' ? ['Unpaid', 'Partially Paid'].includes(Calc.jobInvoiceStatus(j)) : Calc.jobInvoiceStatus(j) === s.inv))
     && (!s.overbudget || (Calc.job(j).costVariance > 0.005))
+    && (!s.bill || (s.bill === 'next3' ? !!billBucket(j) : billBucket(j) === s.bill))
     && (!q || jobSearchText(j).includes(q)));
 }
 const JOB_COLS = () => {
@@ -1694,7 +1772,7 @@ const JOB_COLS = () => {
       { k: 'pcost', label: 'Plan / actual cost', r: 1, fmt: j => { const x = Calc.job(j); return `${fmtN(x.plannedCost)}<div class="small">${x.hasActuals ? varHTML(x.costVariance, true, true) : '<span class="faint">no actuals</span>'}</div>`; }, val: j => Calc.job(j).plannedCost },
       { k: 'gp', label: 'GP % plan → actual', r: 1, fmt: j => { const x = Calc.job(j); return `${pct(x.plannedGPPct)} → ${x.hasActuals ? `<b>${pct(x.actualGPPct)}</b>` : '<span class="faint">—</span>'}`; }, val: j => Calc.job(j).hasActuals ? Calc.job(j).actualGPPct : Calc.job(j).plannedGPPct },
     ] : []),
-    { k: 'inv', label: 'Invoice', fmt: j => invBadge(Calc.jobInvoiceStatus(j)), val: j => INVOICE_STATUSES.indexOf(Calc.jobInvoiceStatus(j)) },
+    { k: 'inv', label: 'Invoice', fmt: j => { const x = Calc.job(j); const ub = r2(x.actualPO - x.invoiced); return invBadge(x.invoiceStatus) + (can('viewFinancials') && ub > 0.005 && j.status !== 'Cancelled' && x.invoiced > 0 ? `<div class="small faint">${compact(ub)} unbilled</div>` : ''); }, val: j => INVOICE_STATUSES.indexOf(Calc.jobInvoiceStatus(j)) },
     { k: 'pe', label: 'Project eng.', fmt: j => esc(nameOf('employees', j.projectEngineerId) || '—'), val: j => nameOf('employees', j.projectEngineerId) },
   ];
 };
@@ -1711,8 +1789,8 @@ VIEWS.jobs = (root, r) => {
   const pageRows = rows.slice((s.page - 1) * s.size, s.page * s.size);
   const counts = Object.fromEntries(['all', ...JOB_TYPES].map(t => [t, APP.db.jobs.filter(j => !j.archived && canType(j.type) && (t === 'all' || j.type === t)).length]));
   const tot = k => r2(sum(rows.filter(j => j.status !== 'Cancelled'), j => Calc.job(j)[k]));
-  const active = ['status', 'inv', 'cust', 'pe', 'se', 'from', 'to', 'month', 'overbudget'].filter(k => s[k]);
-  const chipLabel = k => ({ status: s.status, inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget' }[k]);
+  const active = ['status', 'inv', 'cust', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
+  const chipLabel = k => ({ status: s.status, inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>${type ? esc(type) + ' jobs' : 'All jobs'}</h1><p>${rows.length} job${rows.length === 1 ? '' : 's'}${s.archived ? ' (archived)' : ''} · newest first by default</p></div>
     <div class="actions">
@@ -1757,8 +1835,8 @@ function jobFields(job, type, isNew) {
       { k: 'type', label: 'Job type', type: 'select', options: JOB_TYPES.filter(canType), req: true, span: 3, readonly: !isNew },
       { k: 'openingDate', label: 'Job opening date', type: 'date', req: true, span: 3 },
       { k: 'status', label: 'Project status', type: 'select', options: statuses, req: true, span: 3, readonly: job?.status === 'Closed', hint: job?.status === 'Closed' ? 'Use Reopen to change' : '' },
-      { k: 'customerId', label: 'Company', type: 'select', options: custOpts(job?.customerId), req: true, span: 6 },
-      { k: 'endClientId', label: 'End-client', type: 'select', options: ecOpts(job?.endClientId), span: 6 },
+      { k: 'customerId', label: 'Company', type: 'select', options: custOpts(job?.customerId), req: true, span: 6, add: canQuickAdd() ? 'customer' : null },
+      { k: 'endClientId', label: 'End-client', type: 'select', options: ecOpts(job?.endClientId), span: 6, add: canQuickAdd() ? 'endClient' : null },
       { k: 'zohoSo', label: 'Zoho SO #', span: 3 }, { k: 'customerOrderNo', label: 'Customer order #', span: 3 },
       { k: 'completionPct', label: 'Completion %', type: 'number', min: 0, maxv: 100, step: 1, span: 3, hint: 'Progress only — does not close the job' },
       { k: 'lpoDate', label: 'LPO date', type: 'date', span: 3 },
@@ -1774,8 +1852,8 @@ function jobFields(job, type, isNew) {
       { k: 'actualStart', label: 'Actual start date', type: 'date', span: 3 }, { k: 'actualFinish', label: 'Actual finish date', type: 'date', span: 3 },
     ],
     team: [
-      { k: 'projectEngineerId', label: 'Project engineer', type: 'select', options: empOpts([job?.projectEngineerId]), span: 6 },
-      { k: 'serviceEngineerId', label: 'Service engineer', type: 'select', options: empOpts([job?.serviceEngineerId]), span: 6 },
+      { k: 'projectEngineerId', label: 'Project engineer', type: 'select', options: empOpts([job?.projectEngineerId]), span: 6, add: canQuickAdd() ? 'pe' : null },
+      { k: 'serviceEngineerId', label: 'Service engineer', type: 'select', options: empOpts([job?.serviceEngineerId]), span: 6, add: canQuickAdd() ? 'se' : null },
     ],
     notes: [{ k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 3 }],
     control: isNew ? [] : [{ k: 'reason', label: 'Reason for change', type: 'textarea', rows: 2, span: 12, hint: job.locked ? 'Required — this job is closed and locked.' : 'Required when revising PO values; recorded in the audit trail.' }],
@@ -1880,24 +1958,25 @@ const lineCost = (v) => can('viewCostRates') ? money(v, { cur: false }) : '<span
 function tabManpower(root, job, x) {
   const P = L(job.id, 'plannedManpower'), A = L(job.id, 'actualManpower');
   const supName = l => l.resourceType === 'outsourced' ? esc(nameOf('suppliers', l.supplierId)) : '<span class="faint">In-house</span>';
-  const base = [
+  const cols = (dLabel, dFrom, dTo) => [
     { k: 'resourceName', label: 'Employee / resource', fmt: l => `<b style="font-weight:600">${esc(l.resourceName)}</b>${l.assignmentId ? ' <span class="badge b-info nodot">Roster</span>' : ''}<div class="small faint">${supName(l)}</div>` },
     { k: 'headcount', label: 'Headcount', r: 1, fmt: l => fmtN(l.headcount, 0) },
-    { k: 'hoursPerPerson', label: 'Hrs / person', r: 1, fmt: l => fmtN(l.hoursPerPerson, 1) },
-    { k: 'hrs', label: 'Total hrs', r: 1, fmt: l => fmtN(Calc.mpHours(l), 1) },
+    { k: 'hoursPerPerson', label: 'Hrs / person / day', r: 1, fmt: l => fmtN(l.hoursPerPerson, 2) },
     { k: 'rate', label: 'Rate / hr', r: 1, fmt: rateCell },
-    { k: 'cost', label: 'Cost', r: 1, fmt: l => lineCost(Calc.mp(l)) },
+    { k: dFrom, label: dLabel, fmt: l => `<span class="nowrap small">${l[dFrom] ? fmtDate(l[dFrom]) + (l[dTo] && l[dTo] !== l[dFrom] ? ' – ' + fmtDate(l[dTo]) : '') : '—'}</span>` },
+    { k: 'days', label: 'Days', r: 1, fmt: l => `<b>${fmtN(Calc.days(l), Calc.days(l) % 1 ? 1 : 0)}</b>` },
+    { k: 'hrs', label: 'Total hrs', r: 1, fmt: l => fmtN(Calc.mpHours(l), 1) },
+    { k: 'cost', label: 'Final cost', r: 1, fmt: l => `<b>${lineCost(Calc.mp(l))}</b>` },
   ];
+  const foot = (t, hc, hrs, cost) => can('viewFinancials') ? `<td>Total</td><td class="r">${fmtN(hc, 0)}</td><td></td><td></td><td></td><td></td><td class="r">${fmtN(hrs, 1)}</td><td class="r">${money(cost, { cur: false })}</td>${lineEditable(job, t) ? '<td></td>' : ''}` : '';
   root.innerHTML = sumStrip([
     ['Headcount plan → actual', `${fmtN(x.plannedHeadcount, 0)} → ${fmtN(x.actualHeadcount, 0)}`, 'sum of line headcounts'],
     ['Hours plan → actual', `${fmtN(x.plannedHours, 0)} → ${fmtN(x.actualHours, 0)}`, `Hours variance ${x.actualHours - x.plannedHours >= 0 ? '+' : ''}${fmtN(x.actualHours - x.plannedHours, 1)}`],
-    ['Planned → actual cost', `${compactF(x.plannedManpower)} → ${compactF(x.actualManpower)}`, can('viewFinancials') ? '' : ''],
-    ['Cost variance', varHTML(r2(x.actualManpower - x.plannedManpower)), x.actualManpower > x.plannedManpower ? '<b class="var-unf" style="font-size:12px">Over budget</b>' : (x.actualManpower ? '<span class="var-fav" style="font-size:12px">Under budget</span>' : '')],
-  ]) + costCard('Planned manpower', 'headcount × hours per person × rate', 'plannedManpower', job, [...base, { k: 'startDate', label: 'Planned dates', fmt: l => `<span class="nowrap small">${fmtDate(l.startDate)} – ${fmtDate(l.endDate)}</span>` }], P, 'Add planned line',
-    can('viewFinancials') && P.length ? `<td>Total</td><td class="r">${fmtN(x.plannedHeadcount, 0)}</td><td></td><td class="r">${fmtN(x.plannedHours, 1)}</td><td></td><td class="r">${money(x.plannedManpower, { cur: false })}</td><td colspan="${lineEditable(job, 'plannedManpower') ? 2 : 1}"></td>` : '')
-    + costCard('Actual manpower', 'one employee per line recommended; repeat lines for different dates/shifts', 'actualManpower', job, [...base, { k: 'dateFrom', label: 'Work date(s)', fmt: l => `<span class="nowrap small">${fmtDate(l.dateFrom)}${l.dateTo && l.dateTo !== l.dateFrom ? ' – ' + fmtDate(l.dateTo) : ''}</span>` }], A, 'Add actual line',
-      can('viewFinancials') && A.length ? `<td>Total</td><td class="r">${fmtN(x.actualHeadcount, 0)}</td><td></td><td class="r">${fmtN(x.actualHours, 1)}</td><td></td><td class="r">${money(x.actualManpower, { cur: false })}</td><td colspan="${lineEditable(job, 'actualManpower') ? 2 : 1}"></td>` : '')
-    + (can('rosterAssign') && !job.locked ? `<p class="small muted">${ic('info', 'sm')} To book named employees with calendar conflict checks, use <a href="#/roster?job=${job.id}">Roster Planner → Assign</a>; assignments appear here automatically as planned lines.</p>` : '');
+    ['Planned → actual cost', `${compactF(x.plannedManpower)} → ${compactF(x.actualManpower)}`, ''],
+    ['Cost variance', x.actualManpower ? varHTML(r2(x.actualManpower - x.plannedManpower)) : '<span class="faint">—</span>', x.actualManpower > x.plannedManpower ? '<b class="var-unf" style="font-size:12px">Over budget</b>' : (x.actualManpower ? '<span class="var-fav" style="font-size:12px">Under budget</span>' : '')],
+  ]) + costCard('Planned manpower', 'headcount × hours per day × days × rate', 'plannedManpower', job, cols('Planned dates', 'startDate', 'endDate'), P, 'Add planned line', P.length ? foot('plannedManpower', x.plannedHeadcount, x.plannedHours, x.plannedManpower) : '')
+    + costCard('Actual manpower', 'one employee per line recommended; repeat lines for different dates/shifts', 'actualManpower', job, cols('Work date(s)', 'dateFrom', 'dateTo'), A, 'Add actual line', A.length ? foot('actualManpower', x.actualHeadcount, x.actualHours, x.actualManpower) : '')
+    + `<p class="small muted">${ic('info', 'sm')} Days default to the working days between the dates (working calendar in Settings) and can be edited per line — e.g. if the crew works weekends.${can('rosterAssign') && !job.locked ? ` To book named employees with conflict checks, use <a href="#/roster?job=${job.id}">Roster Planner → Assign</a>; assignments appear here automatically.` : ''}</p>`;
 }
 const compactF = v => can('viewFinancials') ? compact(v) : '•••';
 function tabMaterials(root, job, x) {
@@ -1924,7 +2003,7 @@ function tabMaterials(root, job, x) {
     ['Planned material', money(x.plannedMaterial), `${P.length} line(s)`],
     ['Actual purchased', money(x.actualMaterialPurchased), `${A.length} purchase line(s)`],
     ['Internal store transfers', money(x.actualMaterialTransfer), `${TR.filter(t => t.status === 'Posted').length} posted · costed, not free`],
-    ['Material variance', varHTML(r2(x.actualMaterial - x.plannedMaterial)), `Total actual ${compactF(x.actualMaterial)}`],
+    ['Material variance', x.actualMaterial ? varHTML(r2(x.actualMaterial - x.plannedMaterial)) : '<span class="faint">—</span>', `Total actual ${compactF(x.actualMaterial)}`],
   ]) + costCard('Planned materials', 'quantity × planned unit price', 'plannedMaterials', job, mcols('expectedDate', 'Expected purchase'), P, 'Add planned material')
     + costCard('Actual purchased materials', 'external supplier purchases', 'actualMaterials', job, mcols('purchaseDate', 'Purchase date · ref.'), A, 'Add purchase')
     + `<section class="card" style="margin-bottom:14px"><div class="card-h"><h2>Internal store transfers <span class="sub">· issued from company store to this job</span></h2>${ed ? `<button class="btn sm primary" data-act="addTransfer" data-job="${job.id}">${ic('truck', 'sm')}Post transfer</button>` : ''}</div>
@@ -1946,7 +2025,7 @@ function tabMisc(root, job, x) {
   root.innerHTML = sumStrip([
     ['Planned misc.', money(x.plannedMisc), `${P.length} line(s)`], ['Actual misc.', money(x.actualMisc), `${A.length} line(s)`],
     ['Paid / outstanding', `${compactF(x.miscPaid)} / ${compactF(x.miscOutstanding)}`, 'from recorded payments'],
-    ['Misc. variance', varHTML(r2(x.actualMisc - x.plannedMisc)), ''],
+    ['Misc. variance', x.actualMisc ? varHTML(r2(x.actualMisc - x.plannedMisc)) : '<span class="faint">—</span>', x.actualMisc ? '' : 'no actuals yet'],
   ]) + costCard('Planned miscellaneous cost', 'transport, accommodation, permits, rental…', 'plannedMisc', job, base, P, 'Add planned expense')
     + costCard('Actual miscellaneous cost', 'status derived from payments — partial payments never mark Paid', 'actualMisc', job, act, A, 'Add actual expense');
 }
@@ -2031,10 +2110,11 @@ function lineFields(t, job, rec) {
       { k: 'resourceType', label: 'Resource type', type: 'select', options: [['inhouse', 'In-house'], ['outsourced', 'Outsourced']], req: true, span: 4 },
       { k: 'supplierId', label: 'Outsourcing company', type: 'select', options: supOpts(rec?.supplierId), span: 8 },
       { k: 'headcount', label: pl ? 'Planned headcount' : 'Actual headcount', type: 'number', min: 1, step: 1, req: true, span: 4 },
-      { k: 'hoursPerPerson', label: pl ? 'Planned hours per person' : 'Hours worked per person', type: 'number', min: 0, req: true, span: 4, hint: 'Per person — not combined crew hours' },
+      { k: 'hoursPerPerson', label: pl ? 'Planned hours per person per day' : 'Hours worked per person per day', type: 'number', min: 0, req: true, span: 4, hint: 'Per person, per day — not combined crew hours' },
       { k: 'rate', label: `Hourly cost rate (${S.currency})`, type: 'number', min: 0, req: true, span: 4, hidden: !rates },
-      ...(pl ? [{ k: 'startDate', label: 'Planned start', type: 'date', span: 6 }, { k: 'endDate', label: 'Planned end', type: 'date', span: 6 }]
-        : [{ k: 'dateFrom', label: 'Work date (from)', type: 'date', req: true, span: 6 }, { k: 'dateTo', label: 'Work date (to)', type: 'date', span: 6, hint: 'Leave blank for a single day' }]),
+      ...(pl ? [{ k: 'startDate', label: 'Planned start', type: 'date', span: 4 }, { k: 'endDate', label: 'Planned end', type: 'date', span: 4 }]
+        : [{ k: 'dateFrom', label: 'Work date (from)', type: 'date', req: true, span: 4 }, { k: 'dateTo', label: 'Work date (to)', type: 'date', span: 4, hint: 'Blank = single day' }]),
+      { k: 'days', label: 'Days', type: 'number', min: 0, step: 0.5, span: 4, hint: '<span id="daysHint">Auto from dates</span>' },
       { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 },
       { k: '_prev', type: 'html', span: 12, html: '<div class="alert info" id="linePrev" style="margin:0"></div>' },
       ...reasonField(job),
@@ -2077,7 +2157,15 @@ function openLineForm(t, job, rec) {
         v = readFormSafe(el, fields);
       }
       const p = $('#linePrev', el); if (!p) return;
-      if (t.includes('Manpower')) { const hrs = num(v.headcount) * num(v.hoursPerPerson); p.innerHTML = `${ic('info', 'sm')} ${fmtN(v.headcount, 0)} × ${fmtN(v.hoursPerPerson, 1)} h = <b>${fmtN(hrs, 1)} hours</b>${can('viewCostRates') ? ` × ${fmtN(v.rate)} = <b>${moneyTxt(r2(hrs * num(v.rate)))}</b>` : ' · rate applied from employee master'}`; }
+      if (t.includes('Manpower')) {
+        const pl = t === 'plannedManpower'; const f1 = pl ? v.startDate : v.dateFrom, f2 = pl ? v.endDate : v.dateTo;
+        const auto = autoDays(f1, f2); const dn = $('[name=days]', el); const dh = $('#daysHint', el);
+        if (dh) dh.textContent = auto ? `Auto: ${auto} working day(s)${f2 && f2 > f1 ? ` · ${dayDiff(f1, f2) + 1} calendar days` : ''}` : 'No dates — defaults to 1';
+        if (dn && e && ['startDate', 'endDate', 'dateFrom', 'dateTo'].includes(e.target.name) && auto) { dn.value = auto; v.days = String(auto); }
+        if (dn && !e && !dn.value && auto) { dn.value = auto; v.days = String(auto); }
+        const days = isNum(v.days) && +v.days > 0 ? +v.days : (auto || 1); const hrs = num(v.headcount) * num(v.hoursPerPerson) * days;
+        p.innerHTML = `${ic('info', 'sm')} ${fmtN(v.headcount, 0)} person × ${fmtN(v.hoursPerPerson, 2)} h/day × ${fmtN(days, days % 1 ? 1 : 0)} days = <b>${fmtN(hrs, 1)} hours</b>${can('viewCostRates') ? ` × ${fmtN(v.rate)}/h = final cost <b>${moneyTxt(r2(hrs * num(v.rate)))}</b>` : ' · rate applied from employee master'}`;
+      }
       else p.innerHTML = `${ic('info', 'sm')} ${fmtN(v.qty, 2)} × ${fmtN(v.unitPrice)} = <b>${moneyTxt(r2(num(v.qty) * num(v.unitPrice)))}</b>`;
     },
     onSubmit(v) {
@@ -2174,6 +2262,41 @@ ACT.closeJob = el => {
 ACT.reopenJob = el => { const job = get('jobs', el.dataset.id); modalForm({ title: `Reopen ${esc(job.jobNo)}`, size: 'narrow', submit: 'Reopen job', intro: '<p class="small muted">Reopening unlocks the job. The closure record and this reason stay in the audit trail.</p>', fields: [{ k: 'toStatus', label: 'Return to status', type: 'select', options: ['Completed', 'In Progress', 'On Hold'], req: true, span: 12 }, { k: 'reason', label: 'Reason for reopening', type: 'textarea', req: true, rows: 3, span: 12 }], values: { toStatus: 'Completed' }, onSubmit(v) { API.reopenJob(job.id, v.reason, v.toStatus); toast('Job reopened'); rerender(); } }); };
 ACT.archiveJob = async el => { const job = get('jobs', el.dataset.id); const c = await confirmBox({ title: `Archive ${job.jobNo}?`, message: 'Archived jobs disappear from lists, dashboards and reports but are kept with full history (soft delete). They can be restored.', confirm: 'Archive', danger: true, reason: true }); if (!c.ok) return; try { API.archiveJob(job.id, c.reason); toast('Job archived'); location.hash = '#/jobs/' + TYPE_SLUG[job.type]; } catch (e) { showErr(e); } };
 ACT.restoreJob = el => { API.restoreJob(el.dataset.id); toast('Job restored'); rerender(); };
+
+/* ---------------- quick-create master records from the job form ---------------- */
+const canQuickAdd = () => can('manageMaster') || can('quickAddMaster');
+function nextCode(table, prefix, filter) {
+  let mx = 0; for (const r of APP.db[table]) { if (filter && !filter(r)) continue; const m = String(r.code || '').match(new RegExp('^' + prefix.replace(/[-]/g, '\\-') + '(\\d+)$')); if (m) mx = Math.max(mx, +m[1]); }
+  return prefix + String(mx + 1).padStart(3, '0');
+}
+ACT.quickAdd = el => {
+  const form = el.closest('form'); const kind = el.dataset.kind; const S = APP.db.settings;
+  const cfg = {
+    customer: { t: 'customers', title: 'New company / customer', fields: [{ k: 'name', label: 'Company name', req: true, span: 8 }, { k: 'code', label: 'Customer code', req: true, span: 4 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'trn', label: 'TRN / VAT number', span: 6 }, { k: 'paymentTerms', label: 'Payment terms', span: 6 }, { k: 'address', label: 'Address', span: 6 }], vals: { code: nextCode('customers', 'C-'), paymentTerms: 'Net 30' } },
+    endClient: { t: 'endClients', title: 'New end-client', fields: [{ k: 'name', label: 'End-client name', req: true, span: 8 }, { k: 'code', label: 'Client code', req: true, span: 4 }, { k: 'customerIds', label: 'Related companies', type: 'multi', options: live('customers').filter(c => c.status === 'Active').map(c => [c.id, c.name]), span: 12, hint: 'Pre-selected: the company chosen on this job' }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'address', label: 'Address / site', span: 6 }], vals: { code: nextCode('endClients', 'E-'), customerIds: form.querySelector('[name=customerId]')?.value ? [form.querySelector('[name=customerId]').value] : [] } },
+    pe: { t: 'employees', title: 'New project engineer', emp: 'Project Engineer', dept: 'Projects' },
+    se: { t: 'employees', title: 'New service engineer', emp: 'Service Engineer', dept: 'Operations' },
+  }[kind];
+  if (cfg.emp) {
+    cfg.fields = [{ k: 'name', label: 'Full name', req: true, span: 8 }, { k: 'code', label: 'Employee ID', req: true, span: 4 }, { k: 'title', label: 'Job title', span: 6 }, { k: 'department', label: 'Department', type: 'select', options: S.departments, span: 6 }, { k: 'phone', label: 'Contact number', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'costRate', label: `Internal cost rate / hour (${S.currency})`, type: 'number', min: 0, span: 6, hidden: !can('viewCostRates') }, { k: 'stdHoursPerDay', label: 'Standard hours / day', type: 'number', min: 0, span: 6 }];
+    cfg.vals = { code: nextCode('employees', 'EMP-', r => r.type === 'inhouse'), title: cfg.emp, department: cfg.dept, stdHoursPerDay: S.hoursPerDay || 8 };
+  }
+  modalForm({
+    title: cfg.title, size: 'wide', submit: 'Create & select', fields: cfg.fields, values: cfg.vals,
+    intro: `<p class="small muted" style="margin-top:0">Saved to Master Data and selected on this job. Your other job entries are kept.${can('manageMaster') ? '' : ' Full details can be completed later by a master-data administrator.'}</p>`,
+    onSubmit(v) {
+      const dup = APP.db[cfg.t].find(r => !r.archived && String(r.name).trim().toLowerCase() === String(v.name || '').trim().toLowerCase() && (!cfg.emp || r.type === 'inhouse'));
+      if (dup) invalid(`“${dup.name}” already exists${dup.status !== 'Active' ? ' (inactive — reactivate it in Master Data)' : ' — select it from the list'}.`, { name: 'Already exists' });
+      const d = { ...v, status: 'Active', ...(cfg.emp ? { type: 'inhouse', employmentType: 'Full-time', capacityPct: 100, rateBasis: 'hour' } : {}) };
+      const rec = API.saveMaster(cfg.t, d, null, { quick: true });
+      const label = cfg.emp ? `${rec.name} · ${rec.title || ''}` : rec.name;
+      const targets = cfg.emp ? ['projectEngineerId', 'serviceEngineerId'] : [el.dataset.field];
+      for (const k of targets) { const sel = form.querySelector(`[name="${k}"]`); if (!sel) continue; const o = document.createElement('option'); o.value = rec.id; o.textContent = label; sel.appendChild(o); }
+      const target = form.querySelector(`[name="${el.dataset.field}"]`); target.value = rec.id; target.dispatchEvent(new Event('change', { bubbles: true }));
+      toast(`${rec.name} created and selected`); setTimeout(() => target.focus(), 50);
+    },
+  });
+};
 
 /* =====================================================================
    Roster planner — capacity timeline, employee lists, assignments
