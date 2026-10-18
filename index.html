@@ -595,6 +595,7 @@ const get = (t, id) => id ? APP.db[t].find(r => r.id === id) : null;
 const live = t => APP.db[t].filter(r => !r.archived);
 const nameOf = (t, id, f = 'name') => get(t, id)?.[f] || '';
 function roleOf(u) { return u && APP.db.roles.find(r => r.id === u.roleId); }
+const isSuperAdmin = () => !!APP.user && APP.user.roleId === 'role_super';
 function can(p) { const r = roleOf(APP.user); return !!(r && r.permissions && r.permissions[p]); }
 function canType(type) { const r = roleOf(APP.user); return !!r && (!r.jobTypes || !r.jobTypes.length || r.jobTypes.includes(type)); }
 function need(p, msg) { if (!APP.user || !APP.user.active) deny('No active user session.'); if (!can(p)) deny(msg || `Permission required: ${PERMS.find(x => x[0] === p)?.[1] || p}`); }
@@ -825,6 +826,11 @@ const API = {
     return tx(() => {
       checkVersion(job, version);
       const before = clone(job); const d = { ...job, ...patch };
+      if ('type' in patch && patch.type !== job.type) {
+        if (!isSuperAdmin()) deny('Only a Super Admin can change the job type after creation.');
+        if (!JOB_TYPES.includes(patch.type)) invalid('Invalid job type.', { type: 'Choose a job type' });
+        if (!reason || !reason.trim()) invalid('A reason is required to change the job type.', { reason: 'Required — job type changed' });
+      }
       if (patch.status === 'Closed' && job.status !== 'Closed') invalid('Use “Close job” to close a job.', { status: 'Use “Close job”' });
       if (job.status === 'Closed' && patch.status && patch.status !== 'Closed') invalid('Use “Reopen job” to change the status of a closed job.', { status: 'Use “Reopen job”' });
       API.validateJob(d, false);
@@ -838,7 +844,7 @@ const API = {
           }
         }
       }
-      const allowed = ['openingDate', 'customerId', 'endClientId', 'zohoSo', 'description', 'status', 'completionPct', 'lpoDate', 'customerOrderNo', 'poValue', 'actualPoValue', 'psDate', 'pfDate', 'actualStart', 'actualFinish', 'projectEngineerId', 'serviceEngineerId', 'comments'];
+      const allowed = ['type', 'openingDate', 'customerId', 'endClientId', 'zohoSo', 'description', 'status', 'completionPct', 'lpoDate', 'customerOrderNo', 'poValue', 'actualPoValue', 'psDate', 'pfDate', 'actualStart', 'actualFinish', 'projectEngineerId', 'serviceEngineerId', 'comments'];
       allowed.forEach(k => { if (k in patch) job[k] = d[k]; });
       if (before.status !== job.status) APP.db.jobStatusHistory.push({ id: uid('jsh'), jobId: id, fromStatus: before.status, toStatus: job.status, at: nowISO(), userId: APP.user.id, note: reason || '' });
       stampUpd(job); audit('update', 'jobs', id, before, job, reason, id); return job;
@@ -1223,7 +1229,6 @@ function shell() {
       <nav class="crumbs" aria-label="Breadcrumb" id="crumbs"></nav>
       <div class="spacer"></div>
       <span id="syncChip">${syncChipHTML()}</span>
-      ${can('exportReports') ? `<button class="btn sm hide-m" data-act="exportExcel" title="Download every table as one Excel workbook">${ic('download', 'sm')}Export Excel</button>` : ''}
     </header>
     <main class="page" id="view" tabindex="-1"></main>
   </div>
@@ -2094,6 +2099,7 @@ VIEWS.overview = (root, r) => {
       ${BP.late ? kpi('Past PF date', mk(BP.late), `#/jobs/all${qs({ bill: 'late', cust: f.cust })}`, 'not yet completed') : ''}</div>` : ''}
   </section>
 
+  ${matrixSection(jobs, f, P, fin, jl)}
   <div class="grid g12">
     ${fin ? `<section class="card c8"><div class="card-h"><h2>Planned → actual margin bridge <span class="sub">· completed &amp; closed jobs</span></h2></div><div class="card-b">${done.length ? bridgeChart({
     label: 'Margin bridge from planned GP to actual GP', steps: [
@@ -2162,9 +2168,65 @@ ACT.ovType = el => { VS.ov.type = el.dataset.v; rerender(); };
 ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', type: '', cust: '', status: '' }; rerender(); };
 
 /* =====================================================================
+   Overview matrices — job titles, engineers, end-clients
+   ===================================================================== */
+const ACTIVE_ST = ['Open', 'Planned', 'In Progress', 'On Hold'];
+function matrixSection(jobs, f, P, fin, jl) {
+  const t = todayISO();
+  const win = P.from ? { from: P.from, to: P.to, label: P.label } : { from: t.slice(0, 8) + '01', to: lastDay(t.slice(0, 7)), label: monthLabel(t.slice(0, 7)) + ' (current month)' };
+  /* --- job title matrix --- */
+  const hpd = APP.db.settings.hoursPerDay || 8; let wdays = 0; for (let d = win.from; d <= win.to && wdays < 400; d = addDays(d, 1)) if (isWorkDay(d)) wdays++;
+  const titles = {}; const T = (name) => titles[name] ||= { title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0 };
+  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active') continue; const r = T(e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled')); r.heads++; r.capacity += wdays * hpd * capacityOf(e) / 100; }
+  const titleOf = l => { const e = get('employees', l.employeeId); return e ? (e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled')) : (l.resourceType === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource'); };
+  const inWin = d => d && d >= win.from && d <= win.to;
+  const scopedIds = new Set(jobs.filter(j => j.status !== 'Cancelled').map(j => j.id));
+  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; T(titleOf(l)).planned += Calc.mpHours(l); }
+  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = T(titleOf(l)); r.actual += Calc.mpHours(l); r.cost = r2(r.cost + Calc.mp(l)); }
+  const trows = Object.values(titles).sort((a, b) => b.actual - a.actual || b.planned - a.planned || a.title.localeCompare(b.title));
+  const tt = k => r2(sum(trows, r => r[k]));
+  /* --- engineers --- */
+  const engRows = (key) => { const m = {}; for (const j of jobs) { const id = j[key]; if (!id) continue; const r = m[id] ||= { id, name: nameOf('employees', id) || 'Unknown', open: 0, planned: 0, progress: 0, hold: 0, completed: 0, active: 0 }; if (j.status === 'Open') r.open++; else if (j.status === 'Planned') r.planned++; else if (j.status === 'In Progress') r.progress++; else if (j.status === 'On Hold') r.hold++; else if (j.status === 'Completed') r.completed++; if (ACTIVE_ST.includes(j.status)) r.active++; } return Object.values(m).sort((a, b) => b.active - a.active || a.name.localeCompare(b.name)); };
+  const engTable = (rows, param, caption) => rows.length ? tableHTML({
+    caption, sticky: false, rows, cols: [
+      { k: 'name', label: 'Engineer', fmt: r => `<a class="jobno" style="font-family:var(--f-body);font-size:13px" href="${jl({ [param]: r.id })}">${esc(r.name)}</a>` },
+      { k: 'active', label: 'Active', r: 1, fmt: r => `<b>${r.active}</b>` }, { k: 'progress', label: 'In prog.', r: 1, fmt: r => r.progress || '<span class="faint">·</span>' },
+      { k: 'open', label: 'Open', r: 1, fmt: r => r.open || '<span class="faint">·</span>' }, { k: 'planned', label: 'Planned', r: 1, fmt: r => r.planned || '<span class="faint">·</span>' },
+      { k: 'hold', label: 'On hold', r: 1, fmt: r => r.hold || '<span class="faint">·</span>' }, { k: 'completed', label: 'Compl.', r: 1, fmt: r => r.completed || '<span class="faint">·</span>' }],
+  }) : emptyMini('No jobs assigned yet');
+  /* --- end-clients --- */
+  const ecm = {}; for (const j of jobs) { const id = j.endClientId || '__none'; const r = ecm[id] ||= { id, name: j.endClientId ? nameOf('endClients', j.endClientId) : '— no end-client —', open: 0, planned: 0, progress: 0, hold: 0, completed: 0, closed: 0, total: 0, po: 0 }; const k = { 'Open': 'open', 'Planned': 'planned', 'In Progress': 'progress', 'On Hold': 'hold', 'Completed': 'completed', 'Closed': 'closed' }[j.status]; if (k) r[k]++; r.total++; if (j.status !== 'Cancelled') r.po = r2(r.po + Calc.job(j).actualPO); }
+  const ecRows = Object.values(ecm).sort((a, b) => (b.progress + b.open + b.planned + b.hold) - (a.progress + a.open + a.planned + a.hold) || b.total - a.total);
+  const n = x => x || '<span class="faint">·</span>';
+  return `<div class="grid g12" style="margin-bottom:14px">
+    <section class="card c5"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2></div>
+      <div class="card-b" style="padding:8px 0 0">${trows.length ? tableHTML({
+        caption: 'Hours by job title', sticky: true, rows: trows, cols: [
+          { k: 'title', label: 'Job title', fmt: r => `<b style="font-weight:600">${esc(r.title)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div>` },
+          { k: 'capacity', label: 'Capacity h', r: 1, fmt: r => fmtN(r.capacity, 0) },
+          { k: 'planned', label: 'Planned h', r: 1, fmt: r => fmtN(r.planned, 0) },
+          { k: 'actual', label: 'Actual h', r: 1, fmt: r => `${fmtN(r.actual, 0)}${r.capacity && r.actual ? `<div class="small ${r.actual > r.capacity ? 'var-unf' : 'faint'}">${pct(r.actual / r.capacity * 100, 0)} of cap.</div>` : ''}` },
+          ...(fin ? [{ k: 'cost', label: 'Actual cost', r: 1, fmt: r => money(r.cost, { cur: false }) }] : [])],
+        foot: `<td>Total</td><td class="r">${fmtN(tt('capacity'), 0)}</td><td class="r">${fmtN(tt('planned'), 0)}</td><td class="r">${fmtN(tt('actual'), 0)}</td>${fin ? `<td class="r">${money(tt('cost'), { cur: false })}</td>` : ''}`,
+      }) : emptyMini('No employees yet')}
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">Capacity = active people × ${wdays} working days × ${hpd} h × availability. Planned/actual hours are manpower lines dated in this window on jobs in scope.</p></div></section>
+    <section class="card c7"><div class="card-h"><h2>End-clients <span class="sub">· jobs in scope</span></h2></div>
+      <div class="card-b" style="padding:8px 0 0">${ecRows.length ? tableHTML({
+        caption: 'End-client matrix', sticky: true, rows: ecRows, cols: [
+          { k: 'name', label: 'End-client', fmt: r => r.id === '__none' ? `<span class="muted">${esc(r.name)}</span>` : `<a class="jobno" style="font-family:var(--f-body);font-size:13px" href="${jl({ ecl: r.id })}">${esc(r.name)}</a>` },
+          { k: 'progress', label: 'In prog.', r: 1, fmt: r => `<b>${n(r.progress)}</b>` }, { k: 'open', label: 'Open', r: 1, fmt: r => n(r.open) }, { k: 'planned', label: 'Planned', r: 1, fmt: r => n(r.planned) },
+          { k: 'hold', label: 'On hold', r: 1, fmt: r => n(r.hold) }, { k: 'completed', label: 'Compl.', r: 1, fmt: r => n(r.completed) }, { k: 'closed', label: 'Closed', r: 1, fmt: r => n(r.closed) }, { k: 'total', label: 'Total', r: 1, fmt: r => `<b>${r.total}</b>` },
+          ...(fin ? [{ k: 'po', label: 'PO value', r: 1, fmt: r => compact(r.po) }] : [])],
+      }) : emptyMini('No jobs in scope')}</div></section>
+    <section class="card c6"><div class="card-h"><h2>Project engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('projectEngineerId'), 'pe', 'Project engineer matrix')}</div></section>
+    <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
+  </div>`;
+}
+
+/* =====================================================================
    Jobs — lists, create/edit form, job detail with costing tabs
    ===================================================================== */
-const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '' };
+const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '', ecl: '' };
 const empOpts = (ids = []) => { const list = APP.db.employees.filter(e => !e.archived && (e.status === 'Active' || ids.includes(e.id))); return list.sort(by('name', 1)).map(e => [e.id, `${e.name} · ${e.title || ''}${e.status !== 'Active' ? ' (inactive)' : ''}${e.type === 'outsourced' ? ' (outsourced)' : ''}`]); };
 const supOpts = (cur) => live('suppliers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
 const custOpts = (cur) => live('customers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
@@ -2177,7 +2239,7 @@ function jobSearchText(j) {
 function filterJobs(type, s) {
   const q = (s.q || '').trim().toLowerCase();
   return APP.db.jobs.filter(j => (s.archived ? j.archived : !j.archived) && canType(j.type) && (!type || j.type === type)
-    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
+    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
     && (!s.from || j.openingDate >= s.from) && (!s.to || j.openingDate <= s.to) && (!s.month || monthKey(j.openingDate) === s.month)
     && (!s.inv || (s.inv === 'open' ? ['Unpaid', 'Partially Paid'].includes(Calc.jobInvoiceStatus(j)) : Calc.jobInvoiceStatus(j) === s.inv))
     && (!s.overbudget || (Calc.job(j).costVariance > 0.005))
@@ -2214,8 +2276,8 @@ VIEWS.jobs = (root, r) => {
   const pageRows = rows.slice((s.page - 1) * s.size, s.page * s.size);
   const counts = Object.fromEntries(['all', ...JOB_TYPES].map(t => [t, APP.db.jobs.filter(j => !j.archived && canType(j.type) && (t === 'all' || j.type === t)).length]));
   const tot = k => r2(sum(rows.filter(j => j.status !== 'Cancelled'), j => Calc.job(j)[k]));
-  const active = ['status', 'inv', 'cust', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
-  const chipLabel = k => ({ status: s.status, inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
+  const active = ['status', 'inv', 'cust', 'ecl', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
+  const chipLabel = k => ({ status: s.status, inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), ecl: 'End-client: ' + nameOf('endClients', s.ecl), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>${type ? esc(type) + ' jobs' : 'All jobs'}</h1><p>${rows.length} job${rows.length === 1 ? '' : 's'}${s.archived ? ' (archived)' : ''} · newest first by default</p></div>
     <div class="actions">
@@ -2257,7 +2319,7 @@ function jobFields(job, type, isNew) {
   return {
     basic: [
       { k: 'jobNo', label: 'Job number', readonly: true, span: 3, hint: isNew ? 'Generated on save' : 'Permanent identifier' },
-      { k: 'type', label: 'Job type', type: 'select', options: JOB_TYPES.filter(canType), req: true, span: 3, readonly: !isNew },
+      { k: 'type', label: 'Job type', type: 'select', options: isNew ? JOB_TYPES.filter(canType) : JOB_TYPES, req: true, span: 3, readonly: !isNew && !isSuperAdmin(), hint: isNew ? '' : isSuperAdmin() ? 'Super Admin may change it (reason required; job number is kept)' : 'Fixed after creation — ask a Super Admin' },
       { k: 'openingDate', label: 'Job opening date', type: 'date', req: true, span: 3 },
       { k: 'status', label: 'Project status', type: 'select', options: statuses, req: true, span: 3, readonly: job?.status === 'Closed', hint: job?.status === 'Closed' ? 'Use Reopen to change' : '' },
       { k: 'customerId', label: 'Company', type: 'select', options: custOpts(job?.customerId), req: true, span: 6, add: canQuickAdd() ? 'customer' : null },
@@ -2319,7 +2381,7 @@ function jobForm(root, job, type, embedded) {
       if (isNew) {
         const j = API.createJob(v, token); toast(`Job ${j.jobNo} created`); location.hash = `#/job/${j.id}/manpower`; return;
       }
-      const patch = {}; for (const k of Object.keys(v)) if (k !== 'reason' && k !== 'type' && String(v[k] ?? '') !== String(job[k] ?? '')) patch[k] = v[k];
+      const patch = {}; for (const k of Object.keys(v)) if (k !== 'reason' && (k !== 'type' || isSuperAdmin()) && String(v[k] ?? '') !== String(job[k] ?? '')) patch[k] = v[k];
       if (!Object.keys(patch).length) { toast('No changes to save'); return; }
       if (patch.status === 'Completed' && S.suggest100OnCompleted && num(v.completionPct) < 100) {
         const c = await confirmBox({ title: 'Set completion to 100%?', message: `Status is changing to <b>Completed</b> but completion is ${num(v.completionPct)}%. Update completion to 100%? Choose Cancel to keep ${num(v.completionPct)}%.`, confirm: 'Set to 100%' });
