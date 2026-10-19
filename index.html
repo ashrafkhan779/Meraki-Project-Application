@@ -2670,10 +2670,10 @@ function lineFields(t, job, rec) {
   if (t === 'plannedManpower' || t === 'actualManpower') {
     const pl = t === 'plannedManpower';
     return [
-      { k: 'employeeId', label: 'Employee / resource', type: 'select', options: empOpts([rec?.employeeId]), placeholder: '— Not a listed employee —', span: 6 },
+      { k: 'resourceType', label: 'Resource type', type: 'select', options: [['inhouse', 'In-house'], ['outsourced', 'Outsourced']], req: true, span: 4, hint: 'Filters the employee list below' },
+      { k: 'employeeId', label: 'Employee / resource', type: 'select', options: empOpts([rec?.employeeId]), placeholder: '— Not a listed employee —', span: 8 },
       { k: 'resourceName', label: 'Resource name (if not listed)', span: 6 },
-      { k: 'resourceType', label: 'Resource type', type: 'select', options: [['inhouse', 'In-house'], ['outsourced', 'Outsourced']], req: true, span: 4 },
-      { k: 'supplierId', label: 'Outsourcing company', type: 'select', options: supOpts(rec?.supplierId), span: 8 },
+      { k: 'supplierId', label: 'Outsourcing company', type: 'select', options: supOpts(rec?.supplierId), span: 6 },
       { k: 'headcount', label: pl ? 'Planned headcount' : 'Actual headcount', type: 'number', min: 1, step: 1, req: true, span: 4 },
       { k: 'hoursPerPerson', label: pl ? 'Planned hours per person per day' : 'Hours worked per person per day', type: 'number', min: 0, req: true, span: 4, hint: 'Per person, per day — not combined crew hours' },
       { k: 'rate', label: `Hourly cost rate (${S.currency})`, type: 'number', min: 0, req: true, span: 4, hidden: !rates },
@@ -2716,6 +2716,16 @@ function openLineForm(t, job, rec) {
   modalForm({
     title: `${rec ? 'Edit' : 'Add'} ${TABLE_LABEL[t].toLowerCase()} · ${esc(job.jobNo)}`, fields, values: vals, size: 'wide', intro: paid,
     onChange(v, el, e) {
+      if (t.includes('Manpower') && (!e || e.target.name === 'resourceType')) { // show only employees of the chosen type
+        const sel = $('[name=employeeId]', el); const sup = $('[name=supplierId]', el)?.closest('.field');
+        if (sel) {
+          const keep = sel.value; const type = v.resourceType || 'inhouse';
+          const list = APP.db.employees.filter(x => !x.archived && x.type === type && (x.status === 'Active' || x.id === keep)).sort(by('name', 1));
+          sel.innerHTML = opt(list.map(x => [x.id, `${x.name} · ${x.title || ''}${x.status !== 'Active' ? ' (inactive)' : ''}`]), list.some(x => x.id === keep) ? keep : '', `— Not a listed ${type === 'outsourced' ? 'outsourced resource' : 'employee'} —`);
+          if (!list.some(x => x.id === keep) && e) { sel.value = ''; v.employeeId = ''; if (type === 'inhouse') { const sp = $('[name=supplierId]', el); if (sp) sp.value = ''; } }
+        }
+        if (sup) sup.style.display = (v.resourceType === 'outsourced') ? '' : 'none';
+      }
       if (e && e.target.name === 'employeeId' && v.employeeId) {
         const emp = get('employees', v.employeeId); const set = (k, x) => { const n = $(`[name=${k}]`, el); if (n) n.value = x ?? ''; };
         set('resourceName', emp.name); set('resourceType', emp.type); set('supplierId', emp.type === 'outsourced' ? emp.supplierId : ''); if (can('viewCostRates')) set('rate', API.empRate(emp));
