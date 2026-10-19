@@ -377,6 +377,18 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .dt.fit td:first-child{min-width:150px}
 .dt.fit.compact th,.dt.fit.compact td{padding-left:6px;padding-right:6px}.dt.fit.compact th:first-child,.dt.fit.compact td:first-child{padding-left:14px}
 
+/* collapsible sidebar (desktop) */
+.shell{transition:grid-template-columns .2s ease}
+.shell.collapsed{grid-template-columns:64px 1fr}
+.shell.collapsed .side{overflow:hidden}
+.shell.collapsed .brand{padding:14px 15px;justify-content:center}.shell.collapsed .brand>div:last-child{display:none}
+.shell.collapsed .nav .grp{display:none}
+.shell.collapsed .nav a{justify-content:center;padding:10px 0}.shell.collapsed .nav a .nl,.shell.collapsed .nav a .cnt{display:none}
+.shell.collapsed .nav a[aria-current=page]::before{left:0}
+.shell.collapsed .side-foot{padding:10px 0;text-align:center}.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:none}.shell.collapsed .side-foot>div{justify-content:center}
+.side-toggle{display:inline-grid}
+@media (max-width:900px){.side-toggle{display:none}.shell.collapsed{grid-template-columns:1fr}.shell.collapsed .side{overflow:auto}.shell.collapsed .brand>div:last-child,.shell.collapsed .nav .grp,.shell.collapsed .nav a .nl,.shell.collapsed .nav a .cnt,.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:revert}.shell.collapsed .nav a{justify-content:flex-start;padding:8px 10px}}
+
 </style>
 </head>
 <body>
@@ -479,6 +491,9 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
   </symbol><symbol id="wow-settings" viewBox="0 0 24 24">
     <rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" stroke="none" style="opacity:var(--wow-icon-fill,0)"/>
     <g fill="none" stroke="currentColor" stroke-linecap="inherit" stroke-linejoin="inherit"><path d="m10 2-1 3-3 1-3 4 2 2-2 2 3 4 3 1 1 3h4l1-3 3-1 3-4-2-2 2-2-3-4-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></g>
+  </symbol><symbol id="wow-sidebar" viewBox="0 0 24 24">
+    <rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" stroke="none" style="opacity:var(--wow-icon-fill,0)"/>
+    <g fill="none" stroke="currentColor" stroke-linecap="inherit" stroke-linejoin="inherit"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></g>
   </symbol><symbol id="wow-success" viewBox="0 0 24 24">
     <rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" stroke="none" style="opacity:var(--wow-icon-fill,0)"/>
     <g fill="none" stroke="currentColor" stroke-linecap="inherit" stroke-linejoin="inherit"><circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/></g>
@@ -1237,12 +1252,13 @@ function shell() {
   const S = APP.db.settings; const r = parseRoute();
   const users = APP.db.users.filter(u => u.active);
   const openJobs = APP.db.jobs.filter(j => !j.archived && !['Closed', 'Cancelled'].includes(j.status) && canType(j.type)).length;
-  return `<div class="shell">
+  let collapsed = false; try { collapsed = localStorage.getItem('jobops.sidebar') === 'collapsed'; } catch (e) { }
+  return `<div class="shell ${collapsed ? 'collapsed' : ''}">
   <aside class="side" id="side" aria-label="Main navigation">
     <div class="brand"><div class="logo">${esc(S.logoText || 'JO')}</div><div><b>${esc(S.companyName)}</b><span>Job &amp; Operations System</span></div></div>
     <nav class="nav">
       <div class="grp">Workspace</div>
-      ${NAV.map(([k, l, i, p]) => can(p) ? `<a href="#/${k}" ${r.view === k || (k === 'jobs' && r.view === 'job') ? 'aria-current="page"' : ''}>${ic(i)}${l}${k === 'jobs' ? `<span class="cnt" title="Active jobs">${openJobs}</span>` : ''}</a>` : '').join('')}
+      ${NAV.map(([k, l, i, p]) => can(p) ? `<a href="#/${k}" title="${esc(l)}" ${r.view === k || (k === 'jobs' && r.view === 'job') ? 'aria-current="page"' : ''}>${ic(i)}<span class="nl">${l}</span>${k === 'jobs' ? `<span class="cnt" title="Active jobs">${openJobs}</span>` : ''}</a>` : '').join('')}
     </nav>
     <div class="side-foot">
       <label>Signed in</label>
@@ -1252,6 +1268,7 @@ function shell() {
   <div class="main">
     <header class="top">
       <button class="icon-btn menu-btn" data-act="menu" aria-label="Open navigation" aria-controls="side" aria-expanded="false">${ic('menu')}</button>
+      <button class="icon-btn side-toggle" data-act="sideToggle" aria-label="${collapsed ? 'Expand navigation' : 'Collapse navigation'}" title="${collapsed ? 'Expand navigation' : 'Collapse navigation for more space'}" aria-pressed="${collapsed}">${ic('sidebar')}</button>
       <button class="icon-btn back-btn" data-act="back" aria-label="Back" title="Back to the previous page">${ic('arrow-left')}</button>
       <nav class="crumbs" aria-label="Breadcrumb" id="crumbs"></nav>
       <div class="spacer"></div>
@@ -1547,6 +1564,7 @@ function bindGlobal() {
 }
 let NAV_DEPTH = 0;
 ACT.back = () => { if (NAV_DEPTH > 0) { NAV_DEPTH -= 2; history.back(); } else location.hash = '#/overview'; };
+ACT.sideToggle = () => { const sh = $('.shell'); const c = sh.classList.toggle('collapsed'); try { localStorage.setItem('jobops.sidebar', c ? 'collapsed' : 'open'); } catch (e) { } const b = $('[data-act=sideToggle]'); if (b) { b.setAttribute('aria-pressed', c); b.title = c ? 'Expand navigation' : 'Collapse navigation for more space'; } };
 ACT.menu = el => { const s = $('#side'); const o = s.classList.toggle('open'); el.setAttribute('aria-expanded', o); };
 ACT.reload = () => location.reload();
 ACT.exportDb = () => { if (!(can('exportReports') || can('manageSettings'))) deny(); download('jobops_backup_' + todayISO() + '.json', JSON.stringify(APP.db, null, 1), 'application/json'); tx(() => audit('export', 'database', 'json', null, { tables: ALL_TABLES.length })); };
@@ -2309,6 +2327,7 @@ const JOB_COLS = () => {
   const f = can('viewFinancials');
   return [
     { k: 'jobNo', label: 'Job no.', fmt: j => `<a class="jobno" href="#/job/${j.id}">${esc(j.jobNo)}</a>`, val: j => j.jobNo },
+    { k: 'zohoSo', label: 'Zoho SO #', fmt: j => j.zohoSo ? `<span class="mono">${esc(j.zohoSo)}</span>` : '<span class="faint">—</span>' },
     { k: 'openingDate', label: 'Opened', fmt: j => `<span class="nowrap">${fmtDate(j.openingDate)}</span>` },
     { k: 'company', label: 'Company / end-client', fmt: j => `<b style="font-weight:600">${esc(nameOf('customers', j.customerId))}</b><div class="small faint">${esc(nameOf('endClients', j.endClientId) || '—')}</div>`, val: j => nameOf('customers', j.customerId) },
     { k: 'description', label: 'Description', cls: 'desc', fmt: j => `<span title="${esc(j.description)}">${esc(j.description)}</span>`, nosort: 1 },
@@ -2358,7 +2377,7 @@ VIEWS.jobs = (root, r) => {
   <section class="card">${tableHTML({
     caption: 'Jobs', view: key, sort: s.sort, dir: s.dir, rows: pageRows, cols: JOB_COLS(),
     empty: APP.db.jobs.length ? 'No jobs match these filters' : 'No jobs yet — create the first one',
-    foot: can('viewFinancials') && rows.length ? `<td colspan="5">Totals · ${rows.filter(j => j.status !== 'Cancelled').length} non-cancelled jobs</td><td class="r">${fmtN(tot('actualPO'))}</td><td class="r">${fmtN(tot('plannedCost'))}<div class="small">${fmtN(tot('actualCost'))} actual</div></td><td class="r">${pct(tot('plannedPO') > 0 ? tot('plannedGP') / tot('plannedPO') * 100 : null)} → ${pct(tot('actualPO') > 0 ? tot('actualGP') / tot('actualPO') * 100 : null)}</td><td colspan="2"></td>` : '',
+    foot: can('viewFinancials') && rows.length ? `<td colspan="6">Totals · ${rows.filter(j => j.status !== 'Cancelled').length} non-cancelled jobs</td><td class="r">${fmtN(tot('actualPO'))}</td><td class="r">${fmtN(tot('plannedCost'))}<div class="small">${fmtN(tot('actualCost'))} actual</div></td><td class="r">${pct(tot('plannedPO') > 0 ? tot('plannedGP') / tot('plannedPO') * 100 : null)} → ${pct(tot('actualPO') > 0 ? tot('actualGP') / tot('actualPO') * 100 : null)}</td><td colspan="2"></td>` : '',
   })}${rows.length ? pagerHTML(key, rows.length, s.page, s.size) : ''}</section>`;
 };
 CHG.jf = el => { const s = VS[el.dataset.view]; s[el.dataset.k] = el.value; s.page = 1; rerender(); };
