@@ -371,6 +371,7 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .back-btn{margin-right:2px}
 .tt-row .chev{transition:transform var(--t);color:var(--faint)}.tt-sub td{background:#FAFBFE;border-bottom:1px solid var(--rule)}.tt-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ok-g{color:var(--success)}.ok-r{color:var(--danger)}
+.tt-cat td{background:#F7F9FD}.tt-cat td:first-child b{font-family:var(--f-head)}
 
 </style>
 </head>
@@ -2200,14 +2201,17 @@ function matrixSection(jobs, f, P, fin, jl) {
   const win = P.from ? { from: P.from, to: P.to, label: P.label } : { from: t.slice(0, 8) + '01', to: lastDay(t.slice(0, 7)), label: monthLabel(t.slice(0, 7)) + ' (current month)' };
   /* --- job title matrix --- */
   const hpd = APP.db.settings.hoursPerDay || 8; let wdays = 0; for (let d = win.from; d <= win.to && wdays < 400; d = addDays(d, 1)) if (isWorkDay(d)) wdays++;
-  const titles = {}; const T = (name) => titles[name] ||= { title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {} };
+  const CATS = ['Management', 'Engineer', 'Worker', 'Uncategorised'];
+  const catOf = e => CATS.includes(e?.category) ? e.category : 'Uncategorised';
+  const titles = {}; const T = (cat, name) => titles[cat + '|' + name] ||= { cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {} };
   const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '' };
-  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active') continue; const r = T(e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled')); r.heads++; const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; P_(r, e).capacity = cap; }
-  const titleOf = l => { const e = get('employees', l.employeeId); return e ? (e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled')) : (l.resourceType === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource'); };
+  const tname = e => e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled');
+  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active') continue; const r = T(catOf(e), tname(e)); r.heads++; const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; P_(r, e).capacity = cap; }
+  const rowFor = l => { const e = get('employees', l.employeeId); return e ? T(catOf(e), tname(e)) : T('Uncategorised', l.resourceType === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource'); };
   const inWin = d => d && d >= win.from && d <= win.to;
   const scopedIds = new Set(jobs.filter(j => j.status !== 'Cancelled').map(j => j.id));
-  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = T(titleOf(l)); const h = Calc.mpHours(l); r.planned += h; const e = get('employees', l.employeeId); if (e) P_(r, e).planned += h; }
-  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = T(titleOf(l)); const h = Calc.mpHours(l), c = Calc.mp(l); r.actual += h; r.cost = r2(r.cost + c); const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); } }
+  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); const h = Calc.mpHours(l); r.planned += h; const e = get('employees', l.employeeId); if (e) P_(r, e).planned += h; }
+  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = rowFor(l); const h = Calc.mpHours(l), c = Calc.mp(l); r.actual += h; r.cost = r2(r.cost + c); const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); } }
   const trows = Object.values(titles).sort((a, b) => b.actual - a.actual || b.planned - a.planned || a.title.localeCompare(b.title));
   const tt = k => r2(sum(trows, r => r[k]));
   const usedPct = r => r.capacity > 0 ? r.actual / r.capacity * 100 : null;
@@ -2215,14 +2219,23 @@ function matrixSection(jobs, f, P, fin, jl) {
   const usedCell = r => usedPct(r) == null ? '<span class="faint">N/A</span>' : `<b class="${okCls(r)}" style="font-family:var(--f-num)">${pct(usedPct(r), 0)}</b>`;
   const diffCell = r => r.capacity > 0 ? `<b class="${okCls(r)}" style="font-family:var(--f-num)">${r.capacity - r.actual >= 0 ? '' : '−'}${fmtN(Math.abs(r.capacity - r.actual), 0)}</b>` : '<span class="faint">—</span>';
   const titleTable = () => {
-    const fc = fin ? 1 : 0;
-    const head = `<tr><th scope="col">Job title</th><th class="r" scope="col">Capacity h</th><th class="r" scope="col">Planned h</th><th class="r" scope="col">Actual h</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference h</th></tr>`;
-    const body = trows.map((r, i) => { const people = Object.values(r.people).sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name)); const key = 'tt' + i;
-      return `<tr class="click tt-row" data-act="toggleTitle" data-key="${key}" aria-expanded="false" tabindex="0" title="${people.length ? 'Click to show the people in this title' : ''}"><td><span style="display:inline-flex;align-items:center;gap:6px">${people.length ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(r.title)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div></span></span></td><td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td></tr>`
-        + people.map(p => `<tr class="tt-sub" data-parent="${key}" hidden><td style="padding-left:40px"><a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.id}">${esc(p.name)}</a>${p.cat ? ` <span class="small faint">· ${esc(p.cat)}</span>` : ''}</td><td class="r">${fmtN(p.capacity, 0)}</td><td class="r">${fmtN(p.planned, 0)}</td><td class="r">${fmtN(p.actual, 0)}</td>${fin ? `<td class="r">${money(p.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(p)}</td><td class="r">${diffCell(p)}</td></tr>`).join(''); }).join('');
-    const tot = { capacity: tt('capacity'), actual: tt('actual') };
-    const foot = `<tr><td>Total</td><td class="r">${fmtN(tot.capacity, 0)}</td><td class="r">${fmtN(tt('planned'), 0)}</td><td class="r">${fmtN(tot.actual, 0)}</td>${fin ? `<td class="r">${money(tt('cost'), { cur: false })}</td>` : ''}<td class="r">${usedCell(tot)}</td><td class="r">${diffCell(tot)}</td></tr>`;
-    return `<div class="tbl-wrap" style="max-height:640px" role="region" aria-label="Hours by job title" tabindex="0"><table class="dt fit"><caption class="sr">Hours by job title</caption><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>`;
+    const num = (r, extra = '') => `<td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td>`;
+    const head = `<tr><th scope="col">Category / job title</th><th class="r" scope="col">Capacity h</th><th class="r" scope="col">Planned h</th><th class="r" scope="col">Actual h</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference h</th></tr>`;
+    let body = '';
+    CATS.forEach((cat, ci) => {
+      const rows = trows.filter(r => r.cat === cat); if (!rows.length) return;
+      const agg = { capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)) }; const heads = sum(rows, r => r.heads);
+      const ck = 'c' + ci;
+      body += `<tr class="click tt-row tt-cat" data-act="toggleTitle" data-path="${ck}" aria-expanded="false" tabindex="0" title="Click to show job titles"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(cat)}</b><div class="small faint">${rows.length} title${rows.length === 1 ? '' : 's'} · ${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
+      rows.forEach((r, ti) => {
+        const people = Object.values(r.people).sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name)); const tk = ck + '/t' + ti;
+        body += `<tr class="click tt-row tt-title" data-act="toggleTitle" data-path="${tk}" data-parent="${ck}" aria-expanded="false" tabindex="0" hidden title="${people.length ? 'Click to show the people in this title' : ''}"><td style="padding-left:34px"><span style="display:inline-flex;align-items:center;gap:6px">${people.length ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(r.title)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(r)}</tr>`;
+        body += people.map(p => `<tr class="tt-sub" data-path="${tk}/${p.id}" data-parent="${tk}" hidden><td style="padding-left:62px"><a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.id}">${esc(p.name)}</a></td>${num(p)}</tr>`).join('');
+      });
+    });
+    const tot = { capacity: tt('capacity'), planned: tt('planned'), actual: tt('actual'), cost: tt('cost') };
+    const foot = `<tr><td>Total · all categories</td>${num(tot)}</tr>`;
+    return `<div class="tbl-wrap" style="max-height:640px" role="region" aria-label="Hours by job title" tabindex="0"><table class="dt fit"><caption class="sr">Hours by category and job title</caption><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>`;
   };
   /* --- engineers --- */
   const engRows = (key) => { const m = {}; for (const j of jobs) { const id = j[key]; if (!id) continue; const r = m[id] ||= { id, name: nameOf('employees', id) || 'Unknown', open: 0, planned: 0, progress: 0, hold: 0, completed: 0, active: 0 }; if (j.status === 'Open') r.open++; else if (j.status === 'Planned') r.planned++; else if (j.status === 'In Progress') r.progress++; else if (j.status === 'On Hold') r.hold++; else if (j.status === 'Completed') r.completed++; if (ACTIVE_ST.includes(j.status)) r.active++; } return Object.values(m).sort((a, b) => b.active - a.active || a.name.localeCompare(b.name)); };
@@ -2249,15 +2262,21 @@ function matrixSection(jobs, f, P, fin, jl) {
           ...(fin ? [{ k: 'po', label: 'PO value', r: 1, fmt: r => money(r.po, { cur: false }) }] : [])],
         foot: `<td>Total · ${ecRows.length} end-client${ecRows.length === 1 ? '' : 's'}</td>${['progress', 'open', 'planned', 'hold', 'completed', 'closed', 'total'].map(k => `<td class="r">${sum(ecRows, r => r[k])}</td>`).join('')}${fin ? `<td class="r">${money(r2(sum(ecRows, r => r.po)), { cur: false })}</td>` : ''}`,
       }) : emptyMini('No jobs in scope')}</div></section>
-    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2></div>
-      <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
-      <p class="small muted" style="padding:8px 16px 12px;margin:0">Capacity = active people × ${wdays} working days × ${hpd} h × availability. Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. Click a title to list its people.</p></div></section>
     <section class="card c6"><div class="card-h"><h2>Project engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('projectEngineerId'), 'pe', 'Project engineer matrix')}</div></section>
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
+    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2></div>
+      <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">Capacity = active people × ${wdays} working days × ${hpd} h × availability. Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. Click a category to list its job titles, and a title to list its people.</p></div></section>
   </div>`;
 }
 
-ACT.toggleTitle = el => { const open = el.getAttribute('aria-expanded') !== 'true'; el.setAttribute('aria-expanded', open); el.querySelector('.chev')?.style.setProperty('transform', open ? 'rotate(90deg)' : ''); $$(`tr[data-parent="${el.dataset.key}"]`).forEach(r => { r.hidden = !open; }); };
+ACT.toggleTitle = el => {
+  const open = el.getAttribute('aria-expanded') !== 'true'; const path = el.dataset.path;
+  el.setAttribute('aria-expanded', open); el.querySelector('.chev')?.style.setProperty('transform', open ? 'rotate(90deg)' : '');
+  const tbl = el.closest('table');
+  if (open) $$(`tr[data-parent="${path}"]`, tbl).forEach(r => { r.hidden = false; });
+  else $$('tr[data-path]', tbl).forEach(r => { if (r.dataset.path.startsWith(path + '/')) { r.hidden = true; if (r.hasAttribute('aria-expanded')) { r.setAttribute('aria-expanded', 'false'); r.querySelector('.chev')?.style.setProperty('transform', ''); } } });
+};
 
 /* =====================================================================
    Jobs — lists, create/edit form, job detail with costing tabs
