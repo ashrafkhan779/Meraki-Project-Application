@@ -367,11 +367,16 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 @media (max-width:900px){.dt.fit th:first-child,.dt.fit td:first-child{min-width:140px}}
 .dt.fit th:not(:first-child){white-space:normal;line-height:1.2;vertical-align:bottom}
 .dt.fit th,.dt.fit td{padding-left:8px;padding-right:8px}.dt.fit td:first-child,.dt.fit th:first-child{padding-left:14px}
+.mcell{display:inline-block;min-width:26px;padding:1px 6px;border-radius:5px;color:var(--accent);text-decoration:none;font-family:var(--f-num);font-weight:600}.mcell.b{font-weight:700}.mcell:hover,.mcell:focus-visible{background:var(--raised);text-decoration:underline}
+.back-btn{margin-right:2px}
 
 </style>
 </head>
 <body>
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="wow-briefcase" viewBox="0 0 24 24">
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true"><symbol id="wow-arrow-left" viewBox="0 0 24 24">
+    <rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" stroke="none" style="opacity:var(--wow-icon-fill,0)"/>
+    <g fill="none" stroke="currentColor" stroke-linecap="inherit" stroke-linejoin="inherit"><path d="M21 12H3m7-7-7 7 7 7"/></g>
+  </symbol><symbol id="wow-briefcase" viewBox="0 0 24 24">
     <rect x="3" y="3" width="18" height="18" rx="6" fill="currentColor" stroke="none" style="opacity:var(--wow-icon-fill,0)"/>
     <g fill="none" stroke="currentColor" stroke-linecap="inherit" stroke-linejoin="inherit"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12a22 22 0 0 0 18 0M10 12v3h4v-3"/></g>
   </symbol><symbol id="wow-building" viewBox="0 0 24 24">
@@ -1239,6 +1244,7 @@ function shell() {
   <div class="main">
     <header class="top">
       <button class="icon-btn menu-btn" data-act="menu" aria-label="Open navigation" aria-controls="side" aria-expanded="false">${ic('menu')}</button>
+      <button class="icon-btn back-btn" data-act="back" aria-label="Back" title="Back to the previous page">${ic('arrow-left')}</button>
       <nav class="crumbs" aria-label="Breadcrumb" id="crumbs"></nav>
       <div class="spacer"></div>
       <span id="syncChip">${syncChipHTML()}</span>
@@ -1527,10 +1533,12 @@ function bindGlobal() {
   const showTip = (el, x, y) => { const t = tip(); if (!t) return; t.innerHTML = el.dataset.tip; t.classList.add('on'); const r = t.getBoundingClientRect(); t.style.left = Math.min(innerWidth - r.width - 8, x + 12) + 'px'; t.style.top = Math.max(8, y - r.height - 10) + 'px'; };
   document.addEventListener('mousemove', e => { const el = e.target.closest('[data-tip]'); if (el) showTip(el, e.clientX, e.clientY); else tip()?.classList.remove('on'); });
   document.addEventListener('focusin', e => { const el = e.target.closest('[data-tip]'); if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left + r.width / 2, r.top); } else tip()?.classList.remove('on'); });
-  window.addEventListener('hashchange', () => { $('#side')?.classList.remove('open'); render(); });
+  window.addEventListener('hashchange', () => { NAV_DEPTH++; $('#side')?.classList.remove('open'); render(); });
   window.addEventListener('online', () => { setSync('saving', 'Back online — refreshing'); Store.reloadAll().then(() => { setSync('live'); rerender(); }).catch(e => setSync('error', e.message)); });
   window.addEventListener('offline', () => setSync('offline'));
 }
+let NAV_DEPTH = 0;
+ACT.back = () => { if (NAV_DEPTH > 0) { NAV_DEPTH -= 2; history.back(); } else location.hash = '#/overview'; };
 ACT.menu = el => { const s = $('#side'); const o = s.classList.toggle('open'); el.setAttribute('aria-expanded', o); };
 ACT.reload = () => location.reload();
 ACT.exportDb = () => { if (!(can('exportReports') || can('manageSettings'))) deny(); download('jobops_backup_' + todayISO() + '.json', JSON.stringify(APP.db, null, 1), 'application/json'); tx(() => audit('export', 'database', 'json', null, { tables: ALL_TABLES.length })); };
@@ -2200,12 +2208,14 @@ function matrixSection(jobs, f, P, fin, jl) {
   const tt = k => r2(sum(trows, r => r[k]));
   /* --- engineers --- */
   const engRows = (key) => { const m = {}; for (const j of jobs) { const id = j[key]; if (!id) continue; const r = m[id] ||= { id, name: nameOf('employees', id) || 'Unknown', open: 0, planned: 0, progress: 0, hold: 0, completed: 0, active: 0 }; if (j.status === 'Open') r.open++; else if (j.status === 'Planned') r.planned++; else if (j.status === 'In Progress') r.progress++; else if (j.status === 'On Hold') r.hold++; else if (j.status === 'Completed') r.completed++; if (ACTIVE_ST.includes(j.status)) r.active++; } return Object.values(m).sort((a, b) => b.active - a.active || a.name.localeCompare(b.name)); };
+  const cell = (v, href, bold) => v ? `<a class="mcell ${bold ? 'b' : ''}" href="${href}" title="Open these jobs">${v}</a>` : '<span class="faint">·</span>';
   const engTable = (rows, param, caption) => rows.length ? tableHTML({
     caption, sticky: false, fit: true, rows, cols: [
       { k: 'name', label: 'Engineer', fmt: r => `<a class="jobno" style="font-family:var(--f-body);font-size:13px" href="${jl({ [param]: r.id })}">${esc(r.name)}</a>` },
-      { k: 'active', label: 'Active', r: 1, fmt: r => `<b>${r.active}</b>` }, { k: 'progress', label: 'In prog.', r: 1, fmt: r => r.progress || '<span class="faint">·</span>' },
-      { k: 'open', label: 'Open', r: 1, fmt: r => r.open || '<span class="faint">·</span>' }, { k: 'planned', label: 'Planned', r: 1, fmt: r => r.planned || '<span class="faint">·</span>' },
-      { k: 'hold', label: 'On hold', r: 1, fmt: r => r.hold || '<span class="faint">·</span>' }, { k: 'completed', label: 'Completed', r: 1, fmt: r => r.completed || '<span class="faint">·</span>' }],
+      { k: 'active', label: 'Active', r: 1, fmt: r => cell(r.active, jl({ [param]: r.id, active: 1 }), true) }, { k: 'progress', label: 'In prog.', r: 1, fmt: r => cell(r.progress, jl({ [param]: r.id, status: 'In Progress' })) },
+      { k: 'open', label: 'Open', r: 1, fmt: r => cell(r.open, jl({ [param]: r.id, status: 'Open' })) }, { k: 'planned', label: 'Planned', r: 1, fmt: r => cell(r.planned, jl({ [param]: r.id, status: 'Planned' })) },
+      { k: 'hold', label: 'On hold', r: 1, fmt: r => cell(r.hold, jl({ [param]: r.id, status: 'On Hold' })) }, { k: 'completed', label: 'Completed', r: 1, fmt: r => cell(r.completed, jl({ [param]: r.id, status: 'Completed' })) }],
+    foot: `<td>Total</td>${['active', 'progress', 'open', 'planned', 'hold', 'completed'].map(k => `<td class="r">${sum(rows, r => r[k])}</td>`).join('')}`,
   }) : emptyMini('No jobs assigned yet');
   /* --- end-clients --- */
   const ecm = {}; for (const j of jobs) { const id = j.endClientId || '__none'; const r = ecm[id] ||= { id, name: j.endClientId ? nameOf('endClients', j.endClientId) : '— no end-client —', open: 0, planned: 0, progress: 0, hold: 0, completed: 0, closed: 0, total: 0, po: 0 }; const k = { 'Open': 'open', 'Planned': 'planned', 'In Progress': 'progress', 'On Hold': 'hold', 'Completed': 'completed', 'Closed': 'closed' }[j.status]; if (k) r[k]++; r.total++; if (j.status !== 'Cancelled') r.po = r2(r.po + Calc.job(j).actualPO); }
@@ -2216,9 +2226,10 @@ function matrixSection(jobs, f, P, fin, jl) {
       <div class="card-b" style="padding:8px 0 0">${ecRows.length ? tableHTML({
         caption: 'End-client matrix', sticky: true, rows: ecRows, fit: true, cols: [
           { k: 'name', label: 'End-client', fmt: r => r.id === '__none' ? `<span class="muted">${esc(r.name)}</span>` : `<a class="jobno" style="font-family:var(--f-body);font-size:13px" href="${jl({ ecl: r.id })}">${esc(r.name)}</a>` },
-          { k: 'progress', label: 'In progress', r: 1, fmt: r => `<b>${n(r.progress)}</b>` }, { k: 'open', label: 'Open', r: 1, fmt: r => n(r.open) }, { k: 'planned', label: 'Planned', r: 1, fmt: r => n(r.planned) },
-          { k: 'hold', label: 'On hold', r: 1, fmt: r => n(r.hold) }, { k: 'completed', label: 'Completed', r: 1, fmt: r => n(r.completed) }, { k: 'closed', label: 'Closed', r: 1, fmt: r => n(r.closed) }, { k: 'total', label: 'Total', r: 1, fmt: r => `<b>${r.total}</b>` },
+          ...[['progress', 'In progress', 'In Progress', 1], ['open', 'Open', 'Open'], ['planned', 'Planned', 'Planned'], ['hold', 'On hold', 'On Hold'], ['completed', 'Completed', 'Completed'], ['closed', 'Closed', 'Closed']].map(([k, label, st, bold]) => ({ k, label, r: 1, fmt: r => r.id === '__none' ? n(r[k]) : cell(r[k], jl({ ecl: r.id, status: st }), bold) })),
+          { k: 'total', label: 'Total', r: 1, fmt: r => r.id === '__none' ? `<b>${r.total}</b>` : cell(r.total, jl({ ecl: r.id }), true) },
           ...(fin ? [{ k: 'po', label: 'PO value', r: 1, fmt: r => money(r.po, { cur: false }) }] : [])],
+        foot: `<td>Total · ${ecRows.length} end-client${ecRows.length === 1 ? '' : 's'}</td>${['progress', 'open', 'planned', 'hold', 'completed', 'closed', 'total'].map(k => `<td class="r">${sum(ecRows, r => r[k])}</td>`).join('')}${fin ? `<td class="r">${money(r2(sum(ecRows, r => r.po)), { cur: false })}</td>` : ''}`,
       }) : emptyMini('No jobs in scope')}</div></section>
     <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? tableHTML({
@@ -2239,7 +2250,7 @@ function matrixSection(jobs, f, P, fin, jl) {
 /* =====================================================================
    Jobs — lists, create/edit form, job detail with costing tabs
    ===================================================================== */
-const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '', ecl: '' };
+const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '', ecl: '', active: '' };
 const empOpts = (ids = []) => { const list = APP.db.employees.filter(e => !e.archived && (e.status === 'Active' || ids.includes(e.id))); return list.sort(by('name', 1)).map(e => [e.id, `${e.name} · ${e.title || ''}${e.status !== 'Active' ? ' (inactive)' : ''}${e.type === 'outsourced' ? ' (outsourced)' : ''}`]); };
 const supOpts = (cur) => live('suppliers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
 const custOpts = (cur) => live('customers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
@@ -2252,7 +2263,7 @@ function jobSearchText(j) {
 function filterJobs(type, s) {
   const q = (s.q || '').trim().toLowerCase();
   return APP.db.jobs.filter(j => (s.archived ? j.archived : !j.archived) && canType(j.type) && (!type || j.type === type)
-    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
+    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.active || ['Open', 'Planned', 'In Progress', 'On Hold'].includes(j.status)) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
     && (!s.from || j.openingDate >= s.from) && (!s.to || j.openingDate <= s.to) && (!s.month || monthKey(j.openingDate) === s.month)
     && (!s.inv || (s.inv === 'open' ? ['Unpaid', 'Partially Paid'].includes(Calc.jobInvoiceStatus(j)) : Calc.jobInvoiceStatus(j) === s.inv))
     && (!s.overbudget || (Calc.job(j).costVariance > 0.005))
@@ -2289,8 +2300,8 @@ VIEWS.jobs = (root, r) => {
   const pageRows = rows.slice((s.page - 1) * s.size, s.page * s.size);
   const counts = Object.fromEntries(['all', ...JOB_TYPES].map(t => [t, APP.db.jobs.filter(j => !j.archived && canType(j.type) && (t === 'all' || j.type === t)).length]));
   const tot = k => r2(sum(rows.filter(j => j.status !== 'Cancelled'), j => Calc.job(j)[k]));
-  const active = ['status', 'inv', 'cust', 'ecl', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
-  const chipLabel = k => ({ status: s.status, inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), ecl: 'End-client: ' + nameOf('endClients', s.ecl), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
+  const active = ['status', 'active', 'inv', 'cust', 'ecl', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
+  const chipLabel = k => ({ status: s.status, active: 'Active (open, planned, in progress, on hold)', inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), ecl: 'End-client: ' + nameOf('endClients', s.ecl), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>${type ? esc(type) + ' jobs' : 'All jobs'}</h1><p>${rows.length} job${rows.length === 1 ? '' : 's'}${s.archived ? ' (archived)' : ''} · newest first by default</p></div>
     <div class="actions">
