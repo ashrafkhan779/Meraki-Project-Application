@@ -2233,15 +2233,15 @@ function matrixSection(jobs, f, P, fin, jl) {
   const CATS = ['Management', 'Engineer', 'Worker', 'Uncategorised'];
   const TT = f.ttype || 'inhouse'; const wantType = ty => TT === 'all' || ty === TT;
   const catOf = e => CATS.includes(e?.category) ? e.category : 'Uncategorised';
-  const titles = {}; const T = (cat, name, comp = '') => titles[comp + '|' + cat + '|' + name] ||= { comp, cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {}, pDays: 0, aDays: 0, hpd };
-  const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '', type: emp.type, pDays: 0, aDays: 0, hpd: num(emp.stdHoursPerDay) || hpd, capPct: capacityOf(emp) };
+  const titles = {}; const T = (cat, name, comp = '') => titles[comp + '|' + cat + '|' + name] ||= { comp, cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {}, pDays: 0, aDays: 0, pHead: 0, aHead: 0, hpd };
+  const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '', type: emp.type, pDays: 0, aDays: 0, pHead: 0, aHead: 0, hpd: num(emp.stdHoursPerDay) || hpd, capPct: capacityOf(emp) };
   const tname = e => e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled');
   for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active' || !wantType(e.type)) continue; const r = T(catOf(e), tname(e), e.type === 'outsourced' ? (nameOf('suppliers', e.supplierId) || 'No outsourcing company') : ''); r.heads++; const p = P_(r, e); if (e.type === 'inhouse') { const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; p.capacity = cap; } }
   const rowFor = l => { const e = get('employees', l.employeeId); if (e) return wantType(e.type) ? T(catOf(e), tname(e), e.type === 'outsourced' ? (nameOf('suppliers', e.supplierId) || 'No outsourcing company') : '') : null; const ty = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse'; return wantType(ty) ? T('Uncategorised', ty === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource', ty === 'outsourced' ? (nameOf('suppliers', l.supplierId) || 'No outsourcing company') : '') : null; };
   const inWin = d => d && d >= win.from && d <= win.to;
   const scopedIds = new Set(jobs.filter(j => j.status !== 'Cancelled').map(j => j.id));
-  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), dd = Calc.days(l) * num(l.headcount); r.planned += h; r.pDays += dd; const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.planned += h; p.pDays += dd; } }
-  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), c = Calc.mp(l), dd = Calc.days(l) * num(l.headcount); r.actual += h; r.cost = r2(r.cost + c); r.aDays += dd; const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); p.aDays += dd; } }
+  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), dd = Calc.days(l) * num(l.headcount); r.planned += h; r.pDays += dd; r.pHead += num(l.headcount); const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.planned += h; p.pDays += dd; p.pHead += num(l.headcount); } }
+  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), c = Calc.mp(l), dd = Calc.days(l) * num(l.headcount); r.actual += h; r.cost = r2(r.cost + c); r.aDays += dd; r.aHead += num(l.headcount); const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); p.aDays += dd; p.aHead += num(l.headcount); } }
   /* outsourced capacity = the days actually used (or the planned days when nothing actual yet) × hours/day × availability */
   for (const r of Object.values(titles)) {
     for (const p of Object.values(r.people)) if (p.type === 'outsourced') { p.capacity = (p.aDays || p.pDays) * p.hpd * p.capPct / 100; r.capacity += p.capacity; }
@@ -2254,10 +2254,11 @@ function matrixSection(jobs, f, P, fin, jl) {
   const usedCell = r => usedPct(r) == null ? '<span class="faint">N/A</span>' : `<b class="${okCls(r)}" style="font-family:var(--f-num)">${pct(usedPct(r), 0)}</b>`;
   const diffCell = r => r.capacity > 0 ? `<b class="${okCls(r)}" style="font-family:var(--f-num)">${r.capacity - r.actual >= 0 ? '' : '−'}${fmtN(Math.abs(r.capacity - r.actual), 0)}</b>` : '<span class="faint">—</span>';
   const titleTable = () => {
-    const num = (r, extra = '') => `<td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td>`;
-    const head = `<tr><th scope="col">${TT === 'outsourced' ? 'Job title / outsourcing company' : 'Category / job title'}</th><th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
+    const hc = r => r.aHead || r.pHead || 0;
+    const num = (r, extra = '') => `${TT === 'outsourced' ? `<td class="r">${hc(r) ? `${fmtN(hc(r), 0)}${!r.aHead && r.pHead ? '<span class="faint small" title="planned — no actual yet"> p</span>' : ''}` : '<span class="faint">·</span>'}</td>` : ''}<td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td>`;
+    const head = `<tr><th scope="col">${TT === 'outsourced' ? 'Job title / outsourcing company' : 'Category / job title'}</th>${TT === 'outsourced' ? '<th class="r" scope="col" title="Headcount from the job manpower lines (actual; planned when nothing actual yet)">Headcount</th>' : ''}<th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
     let body = '';
-    const aggOf = rows => ({ capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)) });
+    const aggOf = rows => ({ capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)), aHead: sum(rows, r => r.aHead), pHead: sum(rows, r => r.pHead) });
     const catBlock = (rowsAll, prefix, parent, depth) => {
       CATS.forEach((cat, ci) => {
         const rows = rowsAll.filter(r => r.cat === cat); if (!rows.length) return;
@@ -2271,7 +2272,7 @@ function matrixSection(jobs, f, P, fin, jl) {
       });
     };
     if (TT === 'outsourced') { // job title → outsourcing company → people
-      const byTitle = {}; trows.forEach(r => { const g = byTitle[r.title] ||= {}; const m = g[r.comp]; if (!m) g[r.comp] = { ...r, people: { ...r.people } }; else { m.heads += r.heads; m.capacity += r.capacity; m.planned += r.planned; m.actual += r.actual; m.cost = r2(m.cost + r.cost); Object.assign(m.people, r.people); } });
+      const byTitle = {}; trows.forEach(r => { const g = byTitle[r.title] ||= {}; const m = g[r.comp]; if (!m) g[r.comp] = { ...r, people: { ...r.people } }; else { m.heads += r.heads; m.capacity += r.capacity; m.planned += r.planned; m.actual += r.actual; m.cost = r2(m.cost + r.cost); m.aHead += r.aHead; m.pHead += r.pHead; Object.assign(m.people, r.people); } });
       Object.keys(byTitle).forEach(k => { byTitle[k] = Object.values(byTitle[k]); });
       Object.entries(byTitle).sort((a, b) => sum(b[1], r => r.actual) - sum(a[1], r => r.actual) || a[0].localeCompare(b[0])).forEach(([title, rows], ti) => {
         const agg = aggOf(rows); const heads = sum(rows, r => r.heads); const tk = 'o' + ti;
@@ -2283,7 +2284,7 @@ function matrixSection(jobs, f, P, fin, jl) {
         });
       });
     } else catBlock(trows, '', null, 0);
-    const tot = { capacity: tt('capacity'), planned: tt('planned'), actual: tt('actual'), cost: tt('cost') };
+    const tot = { capacity: tt('capacity'), planned: tt('planned'), actual: tt('actual'), cost: tt('cost'), aHead: tt('aHead'), pHead: tt('pHead') };
     const foot = `<tr><td>Total · all categories</td>${num(tot)}</tr>`;
     return `<div class="tbl-wrap" style="max-height:640px" role="region" aria-label="Hours by job title" tabindex="0"><table class="dt fit"><caption class="sr">Hours by category and job title</caption><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>`;
   };
@@ -2319,7 +2320,7 @@ function matrixSection(jobs, f, P, fin, jl) {
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
     <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
-      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click a job title to list the outsourcing companies supplying it, and a company to list its people.' : 'Click a category to list its job titles, and a title to list its people.'}</p></div></section>
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability. Headcount is summed from the job manpower lines (actual; “p” = planned only).` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click a job title to list the outsourcing companies supplying it, and a company to list its people.' : 'Click a category to list its job titles, and a title to list its people.'}</p></div></section>
   </div>`;
 }
 
