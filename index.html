@@ -388,6 +388,7 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .shell.collapsed .side-foot{padding:10px 0;text-align:center}.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:none}.shell.collapsed .side-foot>div{justify-content:center}
 .side-toggle{display:inline-grid}
 @media (max-width:900px){.side-toggle{display:none}.shell.collapsed{grid-template-columns:1fr}.shell.collapsed .side{overflow:auto}.shell.collapsed .brand>div:last-child,.shell.collapsed .nav .grp,.shell.collapsed .nav a .nl,.shell.collapsed .nav a .cnt,.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:revert}.shell.collapsed .nav a{justify-content:flex-start;padding:8px 10px}}
+.tt-comp td{background:#EEF2FA}.tt-comp td:first-child b{font-family:var(--f-head);color:var(--accent)}
 
 </style>
 </head>
@@ -2232,11 +2233,11 @@ function matrixSection(jobs, f, P, fin, jl) {
   const CATS = ['Management', 'Engineer', 'Worker', 'Uncategorised'];
   const TT = f.ttype || 'inhouse'; const wantType = ty => TT === 'all' || ty === TT;
   const catOf = e => CATS.includes(e?.category) ? e.category : 'Uncategorised';
-  const titles = {}; const T = (cat, name) => titles[cat + '|' + name] ||= { cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {}, pDays: 0, aDays: 0, hpd };
+  const titles = {}; const T = (cat, name, comp = '') => titles[comp + '|' + cat + '|' + name] ||= { comp, cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {}, pDays: 0, aDays: 0, hpd };
   const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '', type: emp.type, pDays: 0, aDays: 0, hpd: num(emp.stdHoursPerDay) || hpd, capPct: capacityOf(emp) };
   const tname = e => e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled');
-  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active' || !wantType(e.type)) continue; const r = T(catOf(e), tname(e)); r.heads++; const p = P_(r, e); if (e.type === 'inhouse') { const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; p.capacity = cap; } }
-  const rowFor = l => { const e = get('employees', l.employeeId); if (e) return wantType(e.type) ? T(catOf(e), tname(e)) : null; const ty = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse'; return wantType(ty) ? T('Uncategorised', ty === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource') : null; };
+  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active' || !wantType(e.type)) continue; const r = T(catOf(e), tname(e), e.type === 'outsourced' ? (nameOf('suppliers', e.supplierId) || 'No outsourcing company') : ''); r.heads++; const p = P_(r, e); if (e.type === 'inhouse') { const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; p.capacity = cap; } }
+  const rowFor = l => { const e = get('employees', l.employeeId); if (e) return wantType(e.type) ? T(catOf(e), tname(e), e.type === 'outsourced' ? (nameOf('suppliers', e.supplierId) || 'No outsourcing company') : '') : null; const ty = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse'; return wantType(ty) ? T('Uncategorised', ty === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource', ty === 'outsourced' ? (nameOf('suppliers', l.supplierId) || 'No outsourcing company') : '') : null; };
   const inWin = d => d && d >= win.from && d <= win.to;
   const scopedIds = new Set(jobs.filter(j => j.status !== 'Cancelled').map(j => j.id));
   for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), dd = Calc.days(l) * num(l.headcount); r.planned += h; r.pDays += dd; const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.planned += h; p.pDays += dd; } }
@@ -2254,19 +2255,29 @@ function matrixSection(jobs, f, P, fin, jl) {
   const diffCell = r => r.capacity > 0 ? `<b class="${okCls(r)}" style="font-family:var(--f-num)">${r.capacity - r.actual >= 0 ? '' : '−'}${fmtN(Math.abs(r.capacity - r.actual), 0)}</b>` : '<span class="faint">—</span>';
   const titleTable = () => {
     const num = (r, extra = '') => `<td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td>`;
-    const head = `<tr><th scope="col">Category / job title</th><th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
+    const head = `<tr><th scope="col">${TT === 'outsourced' ? 'Outsourcing company / category / job title' : 'Category / job title'}</th><th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
     let body = '';
-    CATS.forEach((cat, ci) => {
-      const rows = trows.filter(r => r.cat === cat); if (!rows.length) return;
-      const agg = { capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)) }; const heads = sum(rows, r => r.heads);
-      const ck = 'c' + ci;
-      body += `<tr class="click tt-row tt-cat" data-act="toggleTitle" data-path="${ck}" aria-expanded="false" tabindex="0" title="Click to show job titles"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(cat)}</b><div class="small faint">${rows.length} title${rows.length === 1 ? '' : 's'} · ${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
-      rows.forEach((r, ti) => {
-        const people = Object.values(r.people).sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name)); const tk = ck + '/t' + ti;
-        body += `<tr class="click tt-row tt-title" data-act="toggleTitle" data-path="${tk}" data-parent="${ck}" aria-expanded="false" tabindex="0" hidden title="${people.length ? 'Click to show the people in this title' : ''}"><td style="padding-left:34px"><span style="display:inline-flex;align-items:center;gap:6px">${people.length ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(r.title)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(r)}</tr>`;
-        body += people.map(p => `<tr class="tt-sub" data-path="${tk}/${p.id}" data-parent="${tk}" hidden><td style="padding-left:62px"><a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.id}">${esc(p.name)}</a></td>${num(p)}</tr>`).join('');
+    const aggOf = rows => ({ capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)) });
+    const catBlock = (rowsAll, prefix, parent, depth) => {
+      CATS.forEach((cat, ci) => {
+        const rows = rowsAll.filter(r => r.cat === cat); if (!rows.length) return;
+        const agg = aggOf(rows); const heads = sum(rows, r => r.heads); const ck = prefix + 'c' + ci;
+        body += `<tr class="click tt-row tt-cat" data-act="toggleTitle" data-path="${ck}" ${parent ? `data-parent="${parent}" hidden` : ''} aria-expanded="false" tabindex="0" title="Click to show job titles"><td style="padding-left:${16 + depth * 22}px"><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(cat)}</b><div class="small faint">${rows.length} title${rows.length === 1 ? '' : 's'} · ${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
+        rows.forEach((r, ti) => {
+          const people = Object.values(r.people).sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name)); const tk = ck + '/t' + ti;
+          body += `<tr class="click tt-row tt-title" data-act="toggleTitle" data-path="${tk}" data-parent="${ck}" aria-expanded="false" tabindex="0" hidden title="${people.length ? 'Click to show the people in this title' : ''}"><td style="padding-left:${16 + (depth + 1) * 22}px"><span style="display:inline-flex;align-items:center;gap:6px">${people.length ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(r.title)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(r)}</tr>`;
+          body += people.map(p => `<tr class="tt-sub" data-path="${tk}/${p.id}" data-parent="${tk}" hidden><td style="padding-left:${16 + (depth + 2) * 22}px"><a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.id}">${esc(p.name)}</a></td>${num(p)}</tr>`).join('');
+        });
       });
-    });
+    };
+    if (TT === 'outsourced') {
+      const comps = [...new Set(trows.map(r => r.comp))].sort((a, b) => a.localeCompare(b));
+      comps.forEach((comp, oi) => {
+        const rows = trows.filter(r => r.comp === comp); const agg = aggOf(rows); const heads = sum(rows, r => r.heads); const ok = 'o' + oi;
+        body += `<tr class="click tt-row tt-cat tt-comp" data-act="toggleTitle" data-path="${ok}" aria-expanded="false" tabindex="0" title="Click to show categories"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(comp)}</b><div class="small faint">${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
+        catBlock(rows, ok + '/', ok, 1);
+      });
+    } else catBlock(trows, '', null, 0);
     const tot = { capacity: tt('capacity'), planned: tt('planned'), actual: tt('actual'), cost: tt('cost') };
     const foot = `<tr><td>Total · all categories</td>${num(tot)}</tr>`;
     return `<div class="tbl-wrap" style="max-height:640px" role="region" aria-label="Hours by job title" tabindex="0"><table class="dt fit"><caption class="sr">Hours by category and job title</caption><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>`;
@@ -2303,7 +2314,7 @@ function matrixSection(jobs, f, P, fin, jl) {
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
     <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
-      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. Click a category to list its job titles, and a title to list its people.</p></div></section>
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click an outsourcing company to list its categories, a category for its job titles, and a title for its people.' : 'Click a category to list its job titles, and a title to list its people.'}</p></div></section>
   </div>`;
 }
 
@@ -3165,9 +3176,22 @@ const REPORTS = [
       return Object.entries(m).filter(([id]) => !f.sup || id === f.sup).map(([, r]) => ({ ...r, jobs: r._jobs.size })).sort(by('total', -1)); }, total: true, dateNote: 'Date filter applies to purchase / expense / work date',
   },
   {
-    id: 'manpower', name: 'Manpower utilisation', desc: 'Capacity vs planned (roster) and actual (cost lines) hours per employee in the period. Default period: current month.', filters: ['date', 'emp'], defaults: () => ({ from: todayISO().slice(0, 8) + '01', to: todayISO() }),
-    cols: [['name', 'Employee'], ['etype', 'Type'], ['capacity', 'Capacity h', 'num'], ['leave', 'Leave days', 'int'], ['planned', 'Rostered h', 'num'], ['actual', 'Actual h', 'num'], ['plannedUtil', 'Rostered %', 'pct'], ['actualUtil', 'Actual %', 'pct']],
-    rows: f => { const from = f.from || todayISO().slice(0, 8) + '01', to = f.to || todayISO(); const hpd = APP.db.settings.hoursPerDay; return APP.db.employees.filter(e => !e.archived && e.status === 'Active' && (!f.emp || e.id === f.emp)).map(e => { let cap = 0, lv = 0, pl = 0; for (let d = from; d <= to; d = addDays(d, 1)) { if (!isWorkDay(d)) continue; if (onLeave(e.id, d)) { lv++; continue; } cap += hpd * capacityOf(e) / 100; pl += sum(loadOn(e.id, d).concat((idx().asgByEmp[e.id] || []).filter(a => a.status === 'Completed' && a.startDate <= d && a.endDate >= d)), a => hpd * num(a.allocationPct) / 100); } const act = sum(APP.db.actualManpower.filter(l => !l.archived && l.employeeId === e.id && l.dateFrom >= from && l.dateFrom <= to), Calc.mpHours); return { name: e.name, etype: e.type === 'outsourced' ? 'Outsourced' : 'In-house', capacity: r2(cap), leave: lv, planned: r2(pl), actual: r2(act), plannedUtil: cap ? pl / cap * 100 : null, actualUtil: cap ? act / cap * 100 : null }; }).sort(by('plannedUtil', -1)); }, total: true,
+    id: 'manpower', name: 'Manpower utilisation', desc: 'Capacity vs planned (roster) and actual (cost lines) hours per employee in the period, with the jobs each person actually worked on. In-house capacity = working days × hours/day; outsourced capacity = days actually used (or planned). Default period: current month.', filters: ['date', 'etype', 'emp'], defaults: () => ({ from: todayISO().slice(0, 8) + '01', to: todayISO(), etype: 'inhouse' }),
+    cols: [['name', 'Employee'], ['etype', 'Type'], ['company', 'Outsourcing company'], ['title', 'Job title'], ['capacity', 'Capacity h', 'num'], ['leave', 'Leave days', 'int'], ['planned', 'Rostered h', 'num'], ['actual', 'Actual h', 'num'], ['actualDays', 'Days used', 'num'], ['plannedUtil', 'Rostered %', 'pct'], ['actualUtil', 'Actual %', 'pct'], ['cost', 'Actual cost', 'money'], ['jobsUsed', 'Jobs used (actual hours)']],
+    rows: f => {
+      const from = f.from || todayISO().slice(0, 8) + '01', to = f.to || todayISO(); const hpd = APP.db.settings.hoursPerDay;
+      return APP.db.employees.filter(e => !e.archived && e.status === 'Active' && (!f.emp || e.id === f.emp) && (!f.etype || e.type === f.etype)).map(e => {
+        let cap = 0, lv = 0, pl = 0;
+        for (let d = from; d <= to; d = addDays(d, 1)) { if (!isWorkDay(d)) continue; if (onLeave(e.id, d)) { lv++; continue; } cap += hpd * capacityOf(e) / 100; pl += sum(loadOn(e.id, d).concat((idx().asgByEmp[e.id] || []).filter(a => a.status === 'Completed' && a.startDate <= d && a.endDate >= d)), a => hpd * num(a.allocationPct) / 100); }
+        const act = APP.db.actualManpower.filter(l => !l.archived && l.employeeId === e.id && l.dateFrom >= from && l.dateFrom <= to && !get('jobs', l.jobId)?.archived);
+        const plan = APP.db.plannedManpower.filter(l => !l.archived && l.employeeId === e.id && (l.startDate || '') >= from && (l.startDate || '') <= to);
+        const aDays = sum(act, l => Calc.days(l) * num(l.headcount)), pDays = sum(plan, l => Calc.days(l) * num(l.headcount));
+        if (e.type === 'outsourced') cap = (aDays || pDays) * (num(e.stdHoursPerDay) || hpd) * capacityOf(e) / 100;
+        const byJob = {}; act.forEach(l => { const j = get('jobs', l.jobId); const k = j ? j.jobNo : '?'; byJob[k] = (byJob[k] || 0) + Calc.mpHours(l); });
+        const actH = sum(act, Calc.mpHours);
+        return { _id: null, name: e.name, etype: e.type === 'outsourced' ? 'Outsourced' : 'In-house', company: e.type === 'outsourced' ? nameOf('suppliers', e.supplierId) : '', title: e.title || '', capacity: r2(cap), leave: lv, planned: r2(pl), actual: r2(actH), actualDays: r2(aDays), plannedUtil: cap ? pl / cap * 100 : null, actualUtil: cap ? actH / cap * 100 : null, cost: r2(sum(act, Calc.mp)), jobsUsed: Object.entries(byJob).sort((a, b) => b[1] - a[1]).map(([k, h]) => `${k} (${fmtN(h, 0)} h)`).join(', ') };
+      }).sort((a, b) => b.actual - a.actual || b.plannedUtil - a.plannedUtil);
+    }, total: true,
   },
   {
     id: 'allocation', name: 'Employee allocation', desc: 'All roster assignments overlapping the period.', filters: ['date', 'type', 'emp'],
@@ -3219,7 +3243,7 @@ VIEWS.reports = (root, r) => {
     return;
   }
   setCrumbs([['Reports', '#/reports'], [R.name, '#/reports/' + R.id]]);
-  const f = vs('rep_' + R.id, Object.assign({ from: '', to: '', type: '', cust: '', ecl: '', sup: '', emp: '', status: '', inv: '' }, R.defaults ? R.defaults() : {}));
+  const f = vs('rep_' + R.id, Object.assign({ from: '', to: '', type: '', cust: '', ecl: '', sup: '', emp: '', status: '', inv: '', etype: '' }, R.defaults ? R.defaults() : {}));
   const { rows, cols, totals } = repData(R, f);
   const s = vs('rv_' + R.id, { sort: '', dir: 'desc', page: 1, size: 50 });
   const tcols = cols.map(c => ({ k: c.k, label: c.label, r: ['money', 'num', 'int', 'pct'].includes(c.t), val: r => r[c.k], fmt: row => c.k === 'jobNo' && row._id ? `<a class="jobno" href="#/job/${row._id}">${esc(row.jobNo)}</a>` : c.k === 'status' && STATUS_CLS[row.status] ? statusBadge(row.status) : (c.k.endsWith('Variance') && c.t === 'money') ? varHTML(row[c.k], c.k === 'costVariance') : repFmt(c, row[c.k]) }));
@@ -3230,7 +3254,7 @@ VIEWS.reports = (root, r) => {
   <div class="filters">
     ${fl.includes('date') ? `<span class="lbl">${esc(R.dateNote || 'Opened')}</span><input type="date" aria-label="From" value="${f.from}" data-chg="rf" data-r="${R.id}" data-k="from"><span class="muted">to</span><input type="date" aria-label="To" value="${f.to}" data-chg="rf" data-r="${R.id}" data-k="to">` : ''}
     ${fl.includes('type') ? sel('type', JOB_TYPES.filter(canType), 'All job types') : ''}${fl.includes('cust') ? sel('cust', custOpts(f.cust), 'All customers') : ''}${fl.includes('ecl') ? sel('ecl', ecOpts(f.ecl), 'All end-clients') : ''}
-    ${fl.includes('sup') ? sel('sup', supOpts(f.sup), 'All suppliers') : ''}${fl.includes('emp') ? sel('emp', empOpts([f.emp]).map(([v, l]) => [v, l.split(' · ')[0]]), 'All employees') : ''}
+    ${fl.includes('etype') ? sel('etype', [['inhouse', 'In-house'], ['outsourced', 'Outsourced']], 'In-house + outsourced') : ''}${fl.includes('sup') ? sel('sup', supOpts(f.sup), 'All suppliers') : ''}${fl.includes('emp') ? sel('emp', empOpts([f.emp]).map(([v, l]) => [v, l.split(' · ')[0]]), 'All employees') : ''}
     ${fl.includes('status') ? sel('status', APP.db.settings.jobStatuses, 'All statuses') : ''}${fl.includes('inv') ? sel('inv', R.id === 'receivables' ? ['Unpaid', 'Partially Paid', 'Paid'] : INVOICE_STATUSES, 'Any invoice status') : ''}
     <button class="btn ghost sm" data-act="repReset" data-r="${R.id}">Reset</button><span class="spacer" style="flex:1"></span><span class="small muted">${rows.length} rows · generated ${fmtDT(nowISO())}</span>
   </div>
@@ -3238,7 +3262,7 @@ VIEWS.reports = (root, r) => {
   <section class="card">${tableHTML({ caption: R.name, view: 'rv_' + R.id, sort: s.sort, dir: s.dir, cols: tcols, rows: sorted.slice((s.page - 1) * s.size, s.page * s.size), empty: 'No records for these filters', foot: totals && rows.length ? totals.map((v, i) => `<td class="${tcols[i].r ? 'r' : ''}">${i === 0 ? 'Total' : v === '' ? '' : repFmt(cols[i], v)}</td>`).join('') : '' })}${rows.length ? pagerHTML('rv_' + R.id, rows.length, s.page, s.size) : ''}</section>`;
 };
 CHG.rf = el => { VS['rep_' + el.dataset.r][el.dataset.k] = el.value; VS['rv_' + el.dataset.r].page = 1; rerender(); };
-ACT.repReset = el => { const R = REPORTS.find(x => x.id === el.dataset.r); VS['rep_' + R.id] = Object.assign({ from: '', to: '', type: '', cust: '', ecl: '', sup: '', emp: '', status: '', inv: '' }, R.defaults ? R.defaults() : {}); rerender(); };
+ACT.repReset = el => { const R = REPORTS.find(x => x.id === el.dataset.r); VS['rep_' + R.id] = Object.assign({ from: '', to: '', type: '', cust: '', ecl: '', sup: '', emp: '', status: '', inv: '', etype: '' }, R.defaults ? R.defaults() : {}); rerender(); };
 function repExport(id, fn) { const R = REPORTS.find(x => x.id === id); const { rows, cols, totals } = repData(R, VS['rep_' + id]); const s = VS['rv_' + id]; const tc = cols.map(c => ({ k: c.k, val: r => r[c.k] })); const sorted = s.sort ? sortRows(rows, tc, s.sort, s.dir) : rows; const data = sorted.map(r => cols.map(c => repRaw(c, r[c.k]))); if (totals) data.push(totals.map((v, i) => i === 0 ? 'Total' : repRaw(cols[i], v))); fn(R.id + '_' + todayISO(), cols.map(c => c.label + (c.t === 'money' ? ` (${APP.db.settings.currency})` : '')), data); }
 ACT.repCSV = el => repExport(el.dataset.r, exportCSV);
 ACT.repXLS = el => repExport(el.dataset.r, exportXLS);
