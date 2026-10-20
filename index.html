@@ -388,7 +388,7 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .shell.collapsed .side-foot{padding:10px 0;text-align:center}.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:none}.shell.collapsed .side-foot>div{justify-content:center}
 .side-toggle{display:inline-grid}
 @media (max-width:900px){.side-toggle{display:none}.shell.collapsed{grid-template-columns:1fr}.shell.collapsed .side{overflow:auto}.shell.collapsed .brand>div:last-child,.shell.collapsed .nav .grp,.shell.collapsed .nav a .nl,.shell.collapsed .nav a .cnt,.shell.collapsed .side-foot label,.shell.collapsed .side-foot>div>div{display:revert}.shell.collapsed .nav a{justify-content:flex-start;padding:8px 10px}}
-.tt-comp td{background:#EEF2FA}.tt-comp td:first-child b{font-family:var(--f-head);color:var(--accent)}
+.tt-comp td{background:#FAFBFE}.tt-comp td:first-child b{color:var(--accent)}
 
 </style>
 </head>
@@ -2255,7 +2255,7 @@ function matrixSection(jobs, f, P, fin, jl) {
   const diffCell = r => r.capacity > 0 ? `<b class="${okCls(r)}" style="font-family:var(--f-num)">${r.capacity - r.actual >= 0 ? '' : '−'}${fmtN(Math.abs(r.capacity - r.actual), 0)}</b>` : '<span class="faint">—</span>';
   const titleTable = () => {
     const num = (r, extra = '') => `<td class="r">${fmtN(r.capacity, 0)}</td><td class="r">${fmtN(r.planned, 0)}</td><td class="r">${fmtN(r.actual, 0)}</td>${fin ? `<td class="r">${money(r.cost, { cur: false })}</td>` : ''}<td class="r">${usedCell(r)}</td><td class="r">${diffCell(r)}</td>`;
-    const head = `<tr><th scope="col">${TT === 'outsourced' ? 'Outsourcing company / category / job title' : 'Category / job title'}</th><th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
+    const head = `<tr><th scope="col">${TT === 'outsourced' ? 'Job title / outsourcing company' : 'Category / job title'}</th><th class="r" scope="col">Capacity (h)</th><th class="r" scope="col">Planned (h)</th><th class="r" scope="col">Actual (h)</th>${fin ? '<th class="r" scope="col">Actual cost</th>' : ''}<th class="r" scope="col" title="Actual hours ÷ capacity">% used</th><th class="r" scope="col" title="Capacity − actual hours">Difference (h)</th></tr>`;
     let body = '';
     const aggOf = rows => ({ capacity: sum(rows, r => r.capacity), planned: sum(rows, r => r.planned), actual: sum(rows, r => r.actual), cost: r2(sum(rows, r => r.cost)) });
     const catBlock = (rowsAll, prefix, parent, depth) => {
@@ -2270,12 +2270,17 @@ function matrixSection(jobs, f, P, fin, jl) {
         });
       });
     };
-    if (TT === 'outsourced') {
-      const comps = [...new Set(trows.map(r => r.comp))].sort((a, b) => a.localeCompare(b));
-      comps.forEach((comp, oi) => {
-        const rows = trows.filter(r => r.comp === comp); const agg = aggOf(rows); const heads = sum(rows, r => r.heads); const ok = 'o' + oi;
-        body += `<tr class="click tt-row tt-cat tt-comp" data-act="toggleTitle" data-path="${ok}" aria-expanded="false" tabindex="0" title="Click to show categories"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(comp)}</b><div class="small faint">${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
-        catBlock(rows, ok + '/', ok, 1);
+    if (TT === 'outsourced') { // job title → outsourcing company → people
+      const byTitle = {}; trows.forEach(r => { const g = byTitle[r.title] ||= {}; const m = g[r.comp]; if (!m) g[r.comp] = { ...r, people: { ...r.people } }; else { m.heads += r.heads; m.capacity += r.capacity; m.planned += r.planned; m.actual += r.actual; m.cost = r2(m.cost + r.cost); Object.assign(m.people, r.people); } });
+      Object.keys(byTitle).forEach(k => { byTitle[k] = Object.values(byTitle[k]); });
+      Object.entries(byTitle).sort((a, b) => sum(b[1], r => r.actual) - sum(a[1], r => r.actual) || a[0].localeCompare(b[0])).forEach(([title, rows], ti) => {
+        const agg = aggOf(rows); const heads = sum(rows, r => r.heads); const tk = 'o' + ti;
+        body += `<tr class="click tt-row tt-cat" data-act="toggleTitle" data-path="${tk}" aria-expanded="false" tabindex="0" title="Click to show outsourcing companies"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b>${esc(title)}</b><div class="small faint">${rows.length} compan${rows.length === 1 ? 'y' : 'ies'} · ${heads} active ${heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(agg)}</tr>`;
+        rows.sort((a, b) => b.actual - a.actual || a.comp.localeCompare(b.comp)).forEach((r, ci) => {
+          const people = Object.values(r.people).sort((a, b) => b.actual - a.actual || a.name.localeCompare(b.name)); const ck = tk + '/c' + ci;
+          body += `<tr class="click tt-row tt-title tt-comp" data-act="toggleTitle" data-path="${ck}" data-parent="${tk}" aria-expanded="false" tabindex="0" hidden title="${people.length ? 'Click to show the people' : ''}"><td style="padding-left:38px"><span style="display:inline-flex;align-items:center;gap:6px">${people.length ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(r.comp)}</b><div class="small faint">${r.heads} active ${r.heads === 1 ? 'person' : 'people'}</div></span></span></td>${num(r)}</tr>`;
+          body += people.map(p => `<tr class="tt-sub" data-path="${ck}/${p.id}" data-parent="${ck}" hidden><td style="padding-left:60px"><a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.id}">${esc(p.name)}</a></td>${num(p)}</tr>`).join('');
+        });
       });
     } else catBlock(trows, '', null, 0);
     const tot = { capacity: tt('capacity'), planned: tt('planned'), actual: tt('actual'), cost: tt('cost') };
@@ -2314,7 +2319,7 @@ function matrixSection(jobs, f, P, fin, jl) {
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
     <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
-      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click an outsourcing company to list its categories, a category for its job titles, and a title for its people.' : 'Click a category to list its job titles, and a title to list its people.'}</p></div></section>
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click a job title to list the outsourcing companies supplying it, and a company to list its people.' : 'Click a category to list its job titles, and a title to list its people.'}</p></div></section>
   </div>`;
 }
 
