@@ -2078,7 +2078,7 @@ function billingPipeline(f) {
 
 VIEWS.overview = (root, r) => {
   setCrumbs([['Overview', '#/overview']]);
-  const f = vs('ov', { year: '', q: '', m: '', type: '', cust: '', status: '' });
+  const f = vs('ov', { year: '', q: '', m: '', type: '', cust: '', status: '', ttype: 'inhouse' });
   const P = periodRange(f); const BP = billingPipeline(f);
   const jobs = scopedJobs({ ...f, from: P.from, to: P.to }); const finJobs = jobs.filter(j => j.status !== 'Cancelled');
   const F = finJobs.map(j => [j, Calc.job(j)]);
@@ -2217,7 +2217,8 @@ function attentionTable(F, t) {
 CHG.ovf = el => { vs('ov', {})[el.dataset.k] = el.value; rerender(); };
 CHG.ovp = el => { const f = VS.ov; const k = el.dataset.k; f[k] = el.value; if (k === 'year') { f.q = ''; f.m = ''; } if (k === 'q' && f.m && !periodMonths(f).map(absToKey).includes(f.m)) f.m = ''; rerender(); };
 ACT.ovType = el => { VS.ov.type = el.dataset.v; rerender(); };
-ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', type: '', cust: '', status: '' }; rerender(); };
+ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', type: '', cust: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
+ACT.ovTT = el => { VS.ov.ttype = el.dataset.v; rerender(); };
 
 /* =====================================================================
    Overview matrices — job titles, engineers, end-clients
@@ -2229,16 +2230,22 @@ function matrixSection(jobs, f, P, fin, jl) {
   /* --- job title matrix --- */
   const hpd = APP.db.settings.hoursPerDay || 8; let wdays = 0; for (let d = win.from; d <= win.to && wdays < 400; d = addDays(d, 1)) if (isWorkDay(d)) wdays++;
   const CATS = ['Management', 'Engineer', 'Worker', 'Uncategorised'];
+  const TT = f.ttype || 'inhouse'; const wantType = ty => TT === 'all' || ty === TT;
   const catOf = e => CATS.includes(e?.category) ? e.category : 'Uncategorised';
-  const titles = {}; const T = (cat, name) => titles[cat + '|' + name] ||= { cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {} };
-  const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '' };
+  const titles = {}; const T = (cat, name) => titles[cat + '|' + name] ||= { cat, title: name, heads: 0, capacity: 0, planned: 0, actual: 0, cost: 0, people: {}, pDays: 0, aDays: 0, hpd };
+  const P_ = (r, emp) => r.people[emp.id] ||= { id: emp.id, name: emp.name, capacity: 0, planned: 0, actual: 0, cost: 0, cat: emp.category || '', type: emp.type, pDays: 0, aDays: 0, hpd: num(emp.stdHoursPerDay) || hpd, capPct: capacityOf(emp) };
   const tname = e => e.title || (e.type === 'outsourced' ? 'Outsourced (untitled)' : 'Untitled');
-  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active') continue; const r = T(catOf(e), tname(e)); r.heads++; const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; P_(r, e).capacity = cap; }
-  const rowFor = l => { const e = get('employees', l.employeeId); return e ? T(catOf(e), tname(e)) : T('Uncategorised', l.resourceType === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource'); };
+  for (const e of APP.db.employees) { if (e.archived || e.status !== 'Active' || !wantType(e.type)) continue; const r = T(catOf(e), tname(e)); r.heads++; const p = P_(r, e); if (e.type === 'inhouse') { const cap = wdays * hpd * capacityOf(e) / 100; r.capacity += cap; p.capacity = cap; } }
+  const rowFor = l => { const e = get('employees', l.employeeId); if (e) return wantType(e.type) ? T(catOf(e), tname(e)) : null; const ty = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse'; return wantType(ty) ? T('Uncategorised', ty === 'outsourced' ? 'Outsourced (unnamed)' : 'Unlisted resource') : null; };
   const inWin = d => d && d >= win.from && d <= win.to;
   const scopedIds = new Set(jobs.filter(j => j.status !== 'Cancelled').map(j => j.id));
-  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); const h = Calc.mpHours(l); r.planned += h; const e = get('employees', l.employeeId); if (e) P_(r, e).planned += h; }
-  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = rowFor(l); const h = Calc.mpHours(l), c = Calc.mp(l); r.actual += h; r.cost = r2(r.cost + c); const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); } }
+  for (const l of APP.db.plannedManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; const d = l.startDate || get('jobs', l.jobId)?.openingDate; if (!inWin(d)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), dd = Calc.days(l) * num(l.headcount); r.planned += h; r.pDays += dd; const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.planned += h; p.pDays += dd; } }
+  for (const l of APP.db.actualManpower) { if (l.archived || !scopedIds.has(l.jobId)) continue; if (!inWin(l.dateFrom)) continue; const r = rowFor(l); if (!r) continue; const h = Calc.mpHours(l), c = Calc.mp(l), dd = Calc.days(l) * num(l.headcount); r.actual += h; r.cost = r2(r.cost + c); r.aDays += dd; const e = get('employees', l.employeeId); if (e) { const p = P_(r, e); p.actual += h; p.cost = r2(p.cost + c); p.aDays += dd; } }
+  /* outsourced capacity = the days actually used (or the planned days when nothing actual yet) × hours/day × availability */
+  for (const r of Object.values(titles)) {
+    for (const p of Object.values(r.people)) if (p.type === 'outsourced') { p.capacity = (p.aDays || p.pDays) * p.hpd * p.capPct / 100; r.capacity += p.capacity; }
+    if (/Outsourced \(unnamed\)/.test(r.title)) r.capacity += (r.aDays || r.pDays) * hpd;
+  }
   const trows = Object.values(titles).sort((a, b) => b.actual - a.actual || b.planned - a.planned || a.title.localeCompare(b.title));
   const tt = k => r2(sum(trows, r => r[k]));
   const usedPct = r => r.capacity > 0 ? r.actual / r.capacity * 100 : null;
@@ -2294,9 +2301,9 @@ function matrixSection(jobs, f, P, fin, jl) {
       }) : emptyMini('No jobs in scope')}</div></section>
     <section class="card c6"><div class="card-h"><h2>Project engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('projectEngineerId'), 'pe', 'Project engineer matrix')}</div></section>
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
-    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2></div>
+    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
-      <p class="small muted" style="padding:8px 16px 12px;margin:0">Capacity = active people × ${wdays} working days × ${hpd} h × availability. Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. Click a category to list its job titles, and a title to list its people.</p></div></section>
+      <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability.` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. Click a category to list its job titles, and a title to list its people.</p></div></section>
   </div>`;
 }
 
