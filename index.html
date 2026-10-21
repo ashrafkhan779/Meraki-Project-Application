@@ -2017,7 +2017,7 @@ const render_ = () => render();
    ===================================================================== */
 function scopedJobs(f = {}) {
   return APP.db.jobs.filter(j => !j.archived && canType(j.type)
-    && (!f.type || j.type === f.type) && (!f.cust || j.customerId === f.cust) && (!f.status || j.status === f.status)
+    && (!f.types || !f.types.length || f.types.includes(j.type)) && (!f.cust || j.customerId === f.cust) && (!f.status || j.status === f.status)
     && (!f.from || j.openingDate >= f.from) && (!f.to || j.openingDate <= f.to));
 }
 function monthsRange(from, to) {
@@ -2069,7 +2069,7 @@ function billBucket(j) {
 function billingPipeline(f) {
   const out = { ready: 0, late: 0, months: Object.fromEntries(billMonths().map(m => [m, 0])), jobs: 0, total: 0 };
   for (const j of APP.db.jobs) {
-    if (!canType(j.type) || (f.type && j.type !== f.type) || (f.cust && j.customerId !== f.cust)) continue;
+    if (!canType(j.type) || (f.types && f.types.length && !f.types.includes(j.type)) || (f.cust && j.customerId !== f.cust)) continue;
     const b = billBucket(j); if (!b) continue; const x = Calc.job(j); const v = r2(x.actualPO - x.invoiced);
     if (b === 'ready') out.ready = r2(out.ready + v); else if (b === 'late') out.late = r2(out.late + v); else out.months[b] = r2(out.months[b] + v);
     out.jobs++; out.total = r2(out.total + v);
@@ -2079,7 +2079,10 @@ function billingPipeline(f) {
 
 VIEWS.overview = (root, r) => {
   setCrumbs([['Overview', '#/overview']]);
-  const f = vs('ov', { year: '', q: '', m: '', type: '', cust: '', status: '', ttype: 'inhouse' });
+  const f = vs('ov', { year: '', q: '', m: '', types: [], cust: '', status: '', ttype: 'inhouse' });
+  if (!Array.isArray(f.types)) f.types = [];
+  const typeSlug = f.types.length === 1 ? TYPE_SLUG[f.types[0]] : 'all'; const typesParam = f.types.length > 1 ? f.types.join(',') : '';
+  const selTypes = JOB_TYPES.filter(x => !f.types.length || f.types.includes(x));
   const P = periodRange(f); const BP = billingPipeline(f);
   const jobs = scopedJobs({ ...f, from: P.from, to: P.to }); const finJobs = jobs.filter(j => j.status !== 'Cancelled');
   const F = finJobs.map(j => [j, Calc.job(j)]);
@@ -2095,8 +2098,8 @@ VIEWS.overview = (root, r) => {
   const done = F.filter(([j]) => ['Completed', 'Closed'].includes(j.status));
   const dPO = r2(sum(done, ([, x]) => x.actualPO)), dGP = r2(sum(done, ([, x]) => x.actualGP)), dPPO = r2(sum(done, ([, x]) => x.plannedPO)), dPGP = r2(sum(done, ([, x]) => x.plannedGP));
   const overBudget = done.filter(([, x]) => x.costVariance > 0.005).length;
-  const fq = (o) => qs({ from: P.from, to: P.to, cust: f.cust, ...o });
-  const jl = (o, slug) => `#/jobs/${slug || (f.type ? TYPE_SLUG[f.type] : 'all')}${fq(o)}`;
+  const fq = (o) => qs({ from: P.from, to: P.to, cust: f.cust, types: typesParam, ...o });
+  const jl = (o, slug) => `#/jobs/${slug || typeSlug}${fq(o)}`;
   const fin = can('viewFinancials');
   const mk = v => can('viewFinancials') ? `<span title="${esc(moneyTxt(v))}">${esc(APP.db.settings.currency)} ${compact(v)}</span>` : money(0);
   const kpi = (label, val, href, sub, lead) => `<${href ? `a href="${href}"` : 'div'} class="kpi ${lead ? 'lead' : ''}"><span class="kl">${label}</span><span class="kv">${val}</span>${sub ? `<span class="ks">${sub}</span>` : ''}</${href ? 'a' : 'div'}>`;
@@ -2105,17 +2108,17 @@ VIEWS.overview = (root, r) => {
   root.innerHTML = `
   <div class="page-head">
     <div class="t"><h1>Operations overview</h1><p>${esc(P.label)} · ${jobs.length} jobs opened in period · financials exclude cancelled jobs · ${esc(APP.db.settings.currency)} · as of ${fmtDate(t)}</p></div>
-    <div class="actions">${can('jobCreate') ? `<a class="btn primary" href="#/jobs/${f.type ? TYPE_SLUG[f.type] : 'service'}/new">${ic('plus', 'sm')}Create job</a>` : ''}</div>
+    <div class="actions">${can('jobCreate') ? `<a class="btn primary" href="#/jobs/${f.types.length === 1 ? TYPE_SLUG[f.types[0]] : 'service'}/new">${ic('plus', 'sm')}Create job</a>` : ''}</div>
   </div>
   <div class="filters" role="group" aria-label="Overview filters">
     <span class="lbl" title="Jobs are placed in the period by their opening date">Period</span>
     <select aria-label="Year" data-chg="ovp" data-k="year">${opt([...new Set([fyOf(t), ...APP.db.jobs.filter(j => !j.archived).map(j => fyOf(j.openingDate))])].sort((a, b) => b - a).map(y => [String(y), fyLabel(y)]), f.year, 'All years')}</select>
     <select aria-label="Quarter" data-chg="ovp" data-k="q" ${f.year ? '' : 'disabled title="Choose a year first"'}>${opt([1, 2, 3, 4].map(q => [String(q), quarterLabel(q)]), f.q, 'All quarters')}</select>
     <select aria-label="Month" data-chg="ovp" data-k="m" ${f.year ? '' : 'disabled title="Choose a year first"'}>${opt(periodMonths(f).map(a => [absToKey(a), monthLabel(absToKey(a))]), f.m, 'All months')}</select>
-    <div class="seg" role="group" aria-label="Job type">${['', ...JOB_TYPES].map(x => `<button aria-pressed="${f.type === x}" data-act="ovType" data-v="${esc(x)}">${x || 'All types'}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Job type (choose one or more)" title="Click to combine types, e.g. Service + Supply">${['', ...JOB_TYPES].map(x => `<button aria-pressed="${x ? f.types.includes(x) : !f.types.length}" data-act="ovType" data-v="${esc(x)}">${x ? (f.types.includes(x) ? '✓ ' : '') + x : 'All types'}</button>`).join('')}</div>
     <select aria-label="Customer" data-chg="ovf" data-k="cust">${opt(custs.map(c => [c.id, c.name]), f.cust, 'All customers')}</select>
     <select aria-label="Project status" data-chg="ovf" data-k="status">${opt(APP.db.settings.jobStatuses, f.status, 'All statuses')}</select>
-    ${Object.values(f).some(Boolean) ? `<button class="btn ghost sm" data-act="ovReset">${ic('close', 'sm')}Reset</button>` : ''}
+    ${(f.year || f.types.length || f.cust || f.status) ? `<button class="btn ghost sm" data-act="ovReset">${ic('close', 'sm')}Reset</button>` : ''}
   </div>
 
   ${fin ? `<section class="insight enter" aria-label="Key insight">
@@ -2146,7 +2149,7 @@ VIEWS.overview = (root, r) => {
       ${kpi('Available employees', RT.available, '#/roster?avail=1', 'some capacity left')}${kpi('Currently assigned', RT.assigned, '#/roster?assigned=1')}${kpi('On leave', RT.leave, '#/roster')}</div>
     ${fin ? `<div class="kgroup" title="Unbilled PO value (actual PO − invoiced) of jobs that are completed but not fully invoiced, or whose planned finish (PF) date falls in the next 3 months. Cancelled jobs excluded. Ignores the period filter.">
       <h3>${ic('invoice', 'sm')}To bill · 3 months</h3>
-      ${kpi('Planned to bill', mk(BP.total), `#/jobs/${f.type ? TYPE_SLUG[f.type] : 'all'}${qs({ bill: 'next3', cust: f.cust })}`, `${BP.jobs} job${BP.jobs === 1 ? '' : 's'} · unbilled PO`, 1)}
+      ${kpi('Planned to bill', mk(BP.total), `#/jobs/${typeSlug}${qs({ bill: 'next3', cust: f.cust, types: typesParam })}`, `${BP.jobs} job${BP.jobs === 1 ? '' : 's'} · unbilled PO`, 1)}
       ${kpi('Completed, not billed', mk(BP.ready), `#/jobs/all${qs({ bill: 'ready', cust: f.cust })}`, 'bill now')}
       ${Object.entries(BP.months).map(([m, v]) => kpi(monthLabel(m), mk(v), `#/jobs/all${qs({ bill: m, cust: f.cust })}`, 'by planned finish')).join('')}
       ${BP.late ? kpi('Past PF date', mk(BP.late), `#/jobs/all${qs({ bill: 'late', cust: f.cust })}`, 'not yet completed') : ''}</div>` : ''}
@@ -2169,14 +2172,14 @@ VIEWS.overview = (root, r) => {
   })}</div></section>
     ${chartCard('c6', 'Monthly job creation', 'by job type · opening date', () => {
     const M = monthsRange(P.from, P.to); const cols = ['var(--c1)', 'var(--c3)', 'var(--c4)'];
-    return barChart({ label: 'Jobs created per month by type', cats: M.map(monthLabel), stacked: true, fmt: v => v.toFixed(0), series: JOB_TYPES.filter(x => !f.type || x === f.type).map((ty, k) => ({ name: ty, color: cols[JOB_TYPES.indexOf(ty)], values: M.map(m => jobs.filter(j => j.type === ty && monthKey(j.openingDate) === m).length), tip: v => `${v} job(s)` })), drill: (i, k) => `#/jobs/${TYPE_SLUG[JOB_TYPES.filter(x => !f.type || x === f.type)[k]]}${fq({ month: M[i] })}` });
+    return barChart({ label: 'Jobs created per month by type', cats: M.map(monthLabel), stacked: true, fmt: v => v.toFixed(0), series: selTypes.map((ty, k) => ({ name: ty, color: cols[JOB_TYPES.indexOf(ty)], values: M.map(m => jobs.filter(j => j.type === ty && monthKey(j.openingDate) === m).length), tip: v => `${v} job(s)` })), drill: (i, k) => `#/jobs/${TYPE_SLUG[selTypes[k]]}${fq({ month: M[i], types: '' })}` });
   })}
     ${fin ? chartCard('c6', 'PO value vs actual cost', 'by opening month', () => {
     const M = monthsRange(P.from, P.to); const g = (m, k) => r2(sum(F.filter(([j]) => monthKey(j.openingDate) === m), ([, x]) => x[k]));
     return barChart({ label: 'PO value versus actual cost per month', cats: M.map(monthLabel), series: [{ name: 'Actual PO value', color: 'var(--c1)', values: M.map(m => g(m, 'actualPO')), tip: v => moneyTxt(v, 0) }, { name: 'Actual cost', color: 'var(--c5)', values: M.map(m => g(m, 'actualCost')), tip: v => moneyTxt(v, 0) }], lines: [{ name: 'Planned cost', color: 'var(--c4)', dash: true, values: M.map(m => g(m, 'plannedCost')) }] });
   }) : ''}
     ${fin ? chartCard('c6', 'Performance by job type', 'planned vs actual GP', () => {
-    const types = JOB_TYPES.filter(x => !f.type || x === f.type); const g = (ty, k) => r2(sum(F.filter(([j]) => j.type === ty), ([, x]) => x[k]));
+    const types = selTypes; const g = (ty, k) => r2(sum(F.filter(([j]) => j.type === ty), ([, x]) => x[k]));
     return barChart({ label: 'Planned versus actual GP and PO by job type', cats: types, series: [{ name: 'Actual PO', color: 'var(--c2)', values: types.map(t => g(t, 'actualPO')), tip: v => moneyTxt(v, 0) }, { name: 'Planned GP', color: 'var(--c1)', dash: true, values: types.map(t => g(t, 'plannedGP')), tip: v => moneyTxt(v, 0) }, { name: 'Actual GP', color: 'var(--c1)', values: types.map(t => g(t, 'actualGP')), tip: (v, i) => `${moneyTxt(v, 0)} · ${pct(g(types[i], 'actualPO') > 0 ? v / g(types[i], 'actualPO') * 100 : null)}` }], drill: i => `#/jobs/${TYPE_SLUG[types[i]]}${fq({})}` })
       + `<div class="tbl-wrap" style="margin-top:8px;border-top:0"><table class="dt"><thead><tr><th>Type</th><th class="r">Jobs</th><th class="r">Plan GP%</th><th class="r">Actual GP%</th></tr></thead><tbody>${types.map(ty => { const po = g(ty, 'plannedPO'), apo = g(ty, 'actualPO'); return `<tr><td>${ty}</td><td class="r">${F.filter(([j]) => j.type === ty).length}</td><td class="r">${pct(po > 0 ? g(ty, 'plannedGP') / po * 100 : null)}</td><td class="r">${pct(apo > 0 ? g(ty, 'actualGP') / apo * 100 : null)}</td></tr>`; }).join('')}</tbody></table></div>`;
   }) : ''}
@@ -2217,8 +2220,8 @@ function attentionTable(F, t) {
 }
 CHG.ovf = el => { vs('ov', {})[el.dataset.k] = el.value; rerender(); };
 CHG.ovp = el => { const f = VS.ov; const k = el.dataset.k; f[k] = el.value; if (k === 'year') { f.q = ''; f.m = ''; } if (k === 'q' && f.m && !periodMonths(f).map(absToKey).includes(f.m)) f.m = ''; rerender(); };
-ACT.ovType = el => { VS.ov.type = el.dataset.v; rerender(); };
-ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', type: '', cust: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
+ACT.ovType = el => { const v = el.dataset.v; const f = VS.ov; if (!v) f.types = []; else { const i = f.types.indexOf(v); if (i >= 0) f.types.splice(i, 1); else f.types.push(v); if (f.types.length === JOB_TYPES.length) f.types = []; } rerender(); };
+ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', types: [], cust: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
 ACT.ovTT = el => { VS.ov.ttype = el.dataset.v; rerender(); };
 
 /* =====================================================================
@@ -2335,7 +2338,7 @@ ACT.toggleTitle = el => {
 /* =====================================================================
    Jobs — lists, create/edit form, job detail with costing tabs
    ===================================================================== */
-const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '', ecl: '', active: '' };
+const JOB_LIST_INIT = { q: '', sort: 'createdAt', dir: 'desc', page: 1, size: 25, status: '', inv: '', cust: '', pe: '', se: '', from: '', to: '', month: '', overbudget: '', archived: '', bill: '', ecl: '', active: '', types: '' };
 const empOpts = (ids = []) => { const list = APP.db.employees.filter(e => !e.archived && (e.status === 'Active' || ids.includes(e.id))); return list.sort(by('name', 1)).map(e => [e.id, `${e.name} · ${e.title || ''}${e.status !== 'Active' ? ' (inactive)' : ''}${e.type === 'outsourced' ? ' (outsourced)' : ''}`]); };
 const supOpts = (cur) => live('suppliers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
 const custOpts = (cur) => live('customers').filter(s => s.status === 'Active' || s.id === cur).sort(by('name', 1)).map(s => [s.id, s.name]);
@@ -2348,7 +2351,7 @@ function jobSearchText(j) {
 function filterJobs(type, s) {
   const q = (s.q || '').trim().toLowerCase();
   return APP.db.jobs.filter(j => (s.archived ? j.archived : !j.archived) && canType(j.type) && (!type || j.type === type)
-    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.active || activeStatuses().includes(j.status)) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
+    && (!s.status || j.status === s.status) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.types || s.types.split(',').includes(j.type)) && (!s.active || activeStatuses().includes(j.status)) && (!s.pe || j.projectEngineerId === s.pe) && (!s.se || j.serviceEngineerId === s.se)
     && (!s.from || j.openingDate >= s.from) && (!s.to || j.openingDate <= s.to) && (!s.month || monthKey(j.openingDate) === s.month)
     && (!s.inv || (s.inv === 'open' ? ['Unpaid', 'Partially Paid'].includes(Calc.jobInvoiceStatus(j)) : Calc.jobInvoiceStatus(j) === s.inv))
     && (!s.overbudget || (Calc.job(j).costVariance > 0.005))
@@ -2386,8 +2389,8 @@ VIEWS.jobs = (root, r) => {
   const pageRows = rows.slice((s.page - 1) * s.size, s.page * s.size);
   const counts = Object.fromEntries(['all', ...JOB_TYPES].map(t => [t, APP.db.jobs.filter(j => !j.archived && canType(j.type) && (t === 'all' || j.type === t)).length]));
   const tot = k => r2(sum(rows.filter(j => j.status !== 'Cancelled'), j => Calc.job(j)[k]));
-  const active = ['status', 'active', 'inv', 'cust', 'ecl', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
-  const chipLabel = k => ({ status: s.status, active: 'Active (' + activeStatuses().join(', ').toLowerCase() + ')', inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), ecl: 'End-client: ' + nameOf('endClients', s.ecl), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
+  const active = ['types', 'status', 'active', 'inv', 'cust', 'ecl', 'pe', 'se', 'from', 'to', 'month', 'overbudget', 'bill'].filter(k => s[k]);
+  const chipLabel = k => ({ types: 'Types: ' + (s.types || '').split(',').join(' + '), status: s.status, active: 'Active (' + activeStatuses().join(', ').toLowerCase() + ')', inv: s.inv === 'open' ? 'Unpaid or partially paid' : 'Invoice: ' + s.inv, cust: nameOf('customers', s.cust), ecl: 'End-client: ' + nameOf('endClients', s.ecl), pe: 'PE: ' + nameOf('employees', s.pe), se: 'SE: ' + nameOf('employees', s.se), from: 'From ' + fmtDate(s.from), to: 'To ' + fmtDate(s.to), month: 'Opened in ' + (s.month ? monthLabel(s.month) : ''), overbudget: 'Over budget', bill: s.bill === 'next3' ? 'To bill · next 3 months' : s.bill === 'ready' ? 'Completed, not billed' : s.bill === 'late' ? 'Past PF date, not billed' : 'To bill · finishes ' + (s.bill && s.bill.length === 7 ? monthLabel(s.bill) : '') }[k]);
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>${type ? esc(type) + ' jobs' : 'All jobs'}</h1><p>${rows.length} job${rows.length === 1 ? '' : 's'}${s.archived ? ' (archived)' : ''} · newest first by default</p></div>
     <div class="actions">
@@ -2914,7 +2917,7 @@ const STATE_BADGE = { 'Available': 'b-ok', 'Partially Available': 'b-info', 'Ful
 function weekStart(iso) { const d = dow(iso); return addDays(iso, -((d + 6) % 7)); }
 VIEWS.roster = (root, r) => {
   setCrumbs([['Roster Planner', '#/roster']]);
-  const s = vs('ro', { mode: 'month', anchor: todayISO(), etype: '', dept: '', q: '', sel: '', list: 'inhouse', picked: [], avail: '', assigned: '' });
+  const s = vs('ro', { mode: 'month', anchor: todayISO(), etype: '', title: '', q: '', sel: '', list: 'inhouse', picked: [], avail: '', assigned: '' });
   if (s._sig !== location.hash) { if (r.params.emp) s.sel = r.params.emp; if (r.params.avail) { s.avail = '1'; s.assigned = ''; } if (r.params.assigned) { s.assigned = '1'; s.avail = ''; } s._sig = location.hash; if (r.params.job && can('rosterAssign')) setTimeout(() => openAssign([], r.params.job), 50); }
   const t = todayISO();
   let days = [];
@@ -2923,7 +2926,7 @@ VIEWS.roster = (root, r) => {
   else if (s.mode === 'timeline') { const a = weekStart(s.anchor); for (let i = 0; i < 91; i++) days.push(addDays(a, i)); }
   else days = [s.anchor];
   const q = s.q.toLowerCase();
-  let emps = APP.db.employees.filter(e => !e.archived && e.status === 'Active' && (!s.etype || e.type === s.etype) && (!s.dept || e.department === s.dept) && (!q || `${e.name} ${e.title} ${e.code}`.toLowerCase().includes(q)));
+  let emps = APP.db.employees.filter(e => !e.archived && e.status === 'Active' && (!s.etype || e.type === s.etype) && (!s.title || (e.title || '') === s.title) && (!q || `${e.name} ${e.title} ${e.code}`.toLowerCase().includes(q)));
   if (s.avail) emps = emps.filter(e => { const st = dayState(e, t); return !st.lv && st.alloc < st.cap; });
   if (s.assigned) emps = emps.filter(e => dayState(e, t).asg.length);
   emps.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
@@ -2949,7 +2952,7 @@ VIEWS.roster = (root, r) => {
     <button class="icon-btn" data-act="roNav" data-d="-1" aria-label="Previous period">${ic('chevron-left')}</button><button class="btn sm" data-act="roNav" data-d="0">Today</button><button class="icon-btn" data-act="roNav" data-d="1" aria-label="Next period">${ic('chevron-right')}</button>
     <b style="font-family:var(--f-head);min-width:150px">${title}</b>
     <select aria-label="Employee type" data-chg="rof" data-k="etype">${opt([['inhouse', 'In-house'], ['outsourced', 'Outsourced']], s.etype, 'All employees')}</select>
-    <select aria-label="Department" data-chg="rof" data-k="dept">${opt(APP.db.settings.departments, s.dept, 'All departments')}</select>
+    <select aria-label="Job title" data-chg="rof" data-k="title">${opt([...new Set(APP.db.employees.filter(e => !e.archived && e.status === 'Active' && e.title).map(e => e.title))].sort(), s.title, 'All job titles')}</select>
     <label class="search" style="max-width:220px;min-width:160px"><span class="sr">Search employees</span>${ic('search', 'sm')}<input type="search" placeholder="Search employee" value="${esc(s.q)}" data-chg="rof" data-k="q" data-focus-key="rosearch"></label>
     ${s.avail ? `<span class="chip">Has capacity today<button data-act="roClr" data-k="avail" aria-label="Remove filter">${ic('close', 'sm')}</button></span>` : ''}${s.assigned ? `<span class="chip">Assigned today<button data-act="roClr" data-k="assigned" aria-label="Remove filter">${ic('close', 'sm')}</button></span>` : ''}
   </div>
