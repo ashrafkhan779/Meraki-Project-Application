@@ -2017,7 +2017,7 @@ const render_ = () => render();
    ===================================================================== */
 function scopedJobs(f = {}) {
   return APP.db.jobs.filter(j => !j.archived && canType(j.type)
-    && (!f.types || !f.types.length || f.types.includes(j.type)) && (!f.cust || j.customerId === f.cust) && (!f.status || j.status === f.status)
+    && (!f.types || !f.types.length || f.types.includes(j.type)) && (!f.cust || j.customerId === f.cust) && (!f.ecl || j.endClientId === f.ecl) && (!f.status || j.status === f.status)
     && (!f.from || j.openingDate >= f.from) && (!f.to || j.openingDate <= f.to));
 }
 function monthsRange(from, to) {
@@ -2069,7 +2069,7 @@ function billBucket(j) {
 function billingPipeline(f) {
   const out = { ready: 0, late: 0, months: Object.fromEntries(billMonths().map(m => [m, 0])), jobs: 0, total: 0 };
   for (const j of APP.db.jobs) {
-    if (!canType(j.type) || (f.types && f.types.length && !f.types.includes(j.type)) || (f.cust && j.customerId !== f.cust)) continue;
+    if (!canType(j.type) || (f.types && f.types.length && !f.types.includes(j.type)) || (f.cust && j.customerId !== f.cust) || (f.ecl && j.endClientId !== f.ecl)) continue;
     const b = billBucket(j); if (!b) continue; const x = Calc.job(j); const v = r2(x.actualPO - x.invoiced);
     if (b === 'ready') out.ready = r2(out.ready + v); else if (b === 'late') out.late = r2(out.late + v); else out.months[b] = r2(out.months[b] + v);
     out.jobs++; out.total = r2(out.total + v);
@@ -2079,7 +2079,7 @@ function billingPipeline(f) {
 
 VIEWS.overview = (root, r) => {
   setCrumbs([['Overview', '#/overview']]);
-  const f = vs('ov', { year: '', q: '', m: '', types: [], cust: '', status: '', ttype: 'inhouse' });
+  const f = vs('ov', { year: '', q: '', m: '', types: [], cust: '', ecl: '', status: '', ttype: 'inhouse' });
   if (!Array.isArray(f.types)) f.types = [];
   const typeSlug = f.types.length === 1 ? TYPE_SLUG[f.types[0]] : 'all'; const typesParam = f.types.length > 1 ? f.types.join(',') : '';
   const selTypes = JOB_TYPES.filter(x => !f.types.length || f.types.includes(x));
@@ -2098,7 +2098,7 @@ VIEWS.overview = (root, r) => {
   const done = F.filter(([j]) => ['Completed', 'Closed'].includes(j.status));
   const dPO = r2(sum(done, ([, x]) => x.actualPO)), dGP = r2(sum(done, ([, x]) => x.actualGP)), dPPO = r2(sum(done, ([, x]) => x.plannedPO)), dPGP = r2(sum(done, ([, x]) => x.plannedGP));
   const overBudget = done.filter(([, x]) => x.costVariance > 0.005).length;
-  const fq = (o) => qs({ from: P.from, to: P.to, cust: f.cust, types: typesParam, ...o });
+  const fq = (o) => qs({ from: P.from, to: P.to, cust: f.cust, ecl: f.ecl, types: typesParam, ...o });
   const jl = (o, slug) => `#/jobs/${slug || typeSlug}${fq(o)}`;
   const fin = can('viewFinancials');
   const mk = v => can('viewFinancials') ? `<span title="${esc(moneyTxt(v))}">${esc(APP.db.settings.currency)} ${compact(v)}</span>` : money(0);
@@ -2117,8 +2117,9 @@ VIEWS.overview = (root, r) => {
     <select aria-label="Month" data-chg="ovp" data-k="m" ${f.year ? '' : 'disabled title="Choose a year first"'}>${opt(periodMonths(f).map(a => [absToKey(a), monthLabel(absToKey(a))]), f.m, 'All months')}</select>
     <div class="seg" role="group" aria-label="Job type (choose one or more)" title="Click to combine types, e.g. Service + Supply">${['', ...JOB_TYPES].map(x => `<button aria-pressed="${x ? f.types.includes(x) : !f.types.length}" data-act="ovType" data-v="${esc(x)}">${x ? (f.types.includes(x) ? '✓ ' : '') + x : 'All types'}</button>`).join('')}</div>
     <select aria-label="Customer" data-chg="ovf" data-k="cust">${opt(custs.map(c => [c.id, c.name]), f.cust, 'All customers')}</select>
+    <select aria-label="End-client" data-chg="ovf" data-k="ecl">${opt(live('endClients').filter(e => (e.status || 'Active') === 'Active' || e.id === f.ecl).sort(by('name', 1)).map(e => [e.id, e.name]), f.ecl, 'All end-clients')}</select>
     <select aria-label="Project status" data-chg="ovf" data-k="status">${opt(APP.db.settings.jobStatuses, f.status, 'All statuses')}</select>
-    ${(f.year || f.types.length || f.cust || f.status) ? `<button class="btn ghost sm" data-act="ovReset">${ic('close', 'sm')}Reset</button>` : ''}
+    ${(f.year || f.types.length || f.cust || f.ecl || f.status) ? `<button class="btn ghost sm" data-act="ovReset">${ic('close', 'sm')}Reset</button>` : ''}
   </div>
 
   ${fin ? `<section class="insight enter" aria-label="Key insight">
@@ -2149,10 +2150,10 @@ VIEWS.overview = (root, r) => {
       ${kpi('Available employees', RT.available, '#/roster?avail=1', 'some capacity left')}${kpi('Currently assigned', RT.assigned, '#/roster?assigned=1')}${kpi('On leave', RT.leave, '#/roster')}</div>
     ${fin ? `<div class="kgroup" title="Unbilled PO value (actual PO − invoiced) of jobs that are completed but not fully invoiced, or whose planned finish (PF) date falls in the next 3 months. Cancelled jobs excluded. Ignores the period filter.">
       <h3>${ic('invoice', 'sm')}To bill · 3 months</h3>
-      ${kpi('Planned to bill', mk(BP.total), `#/jobs/${typeSlug}${qs({ bill: 'next3', cust: f.cust, types: typesParam })}`, `${BP.jobs} job${BP.jobs === 1 ? '' : 's'} · unbilled PO`, 1)}
-      ${kpi('Completed, not billed', mk(BP.ready), `#/jobs/all${qs({ bill: 'ready', cust: f.cust })}`, 'bill now')}
-      ${Object.entries(BP.months).map(([m, v]) => kpi(monthLabel(m), mk(v), `#/jobs/all${qs({ bill: m, cust: f.cust })}`, 'by planned finish')).join('')}
-      ${BP.late ? kpi('Past PF date', mk(BP.late), `#/jobs/all${qs({ bill: 'late', cust: f.cust })}`, 'not yet completed') : ''}</div>` : ''}
+      ${kpi('Planned to bill', mk(BP.total), `#/jobs/${typeSlug}${qs({ bill: 'next3', cust: f.cust, ecl: f.ecl, types: typesParam })}`, `${BP.jobs} job${BP.jobs === 1 ? '' : 's'} · unbilled PO`, 1)}
+      ${kpi('Completed, not billed', mk(BP.ready), `#/jobs/all${qs({ bill: 'ready', cust: f.cust, ecl: f.ecl })}`, 'bill now')}
+      ${Object.entries(BP.months).map(([m, v]) => kpi(monthLabel(m), mk(v), `#/jobs/all${qs({ bill: m, cust: f.cust, ecl: f.ecl })}`, 'by planned finish')).join('')}
+      ${BP.late ? kpi('Past PF date', mk(BP.late), `#/jobs/all${qs({ bill: 'late', cust: f.cust, ecl: f.ecl })}`, 'not yet completed') : ''}</div>` : ''}
   </section>
 
   ${matrixSection(jobs, f, P, fin, jl)}
@@ -2221,7 +2222,7 @@ function attentionTable(F, t) {
 CHG.ovf = el => { vs('ov', {})[el.dataset.k] = el.value; rerender(); };
 CHG.ovp = el => { const f = VS.ov; const k = el.dataset.k; f[k] = el.value; if (k === 'year') { f.q = ''; f.m = ''; } if (k === 'q' && f.m && !periodMonths(f).map(absToKey).includes(f.m)) f.m = ''; rerender(); };
 ACT.ovType = el => { const v = el.dataset.v; const f = VS.ov; if (!v) f.types = []; else { const i = f.types.indexOf(v); if (i >= 0) f.types.splice(i, 1); else f.types.push(v); if (f.types.length === JOB_TYPES.length) f.types = []; } rerender(); };
-ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', types: [], cust: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
+ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', types: [], cust: '', ecl: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
 ACT.ovTT = el => { VS.ov.ttype = el.dataset.v; rerender(); };
 
 /* =====================================================================
@@ -2952,7 +2953,7 @@ VIEWS.roster = (root, r) => {
     <button class="icon-btn" data-act="roNav" data-d="-1" aria-label="Previous period">${ic('chevron-left')}</button><button class="btn sm" data-act="roNav" data-d="0">Today</button><button class="icon-btn" data-act="roNav" data-d="1" aria-label="Next period">${ic('chevron-right')}</button>
     <b style="font-family:var(--f-head);min-width:150px">${title}</b>
     <select aria-label="Employee type" data-chg="rof" data-k="etype">${opt([['inhouse', 'In-house'], ['outsourced', 'Outsourced']], s.etype, 'All employees')}</select>
-    <select aria-label="Job title" data-chg="rof" data-k="title">${opt([...new Set(APP.db.employees.filter(e => !e.archived && e.status === 'Active' && e.title).map(e => e.title))].sort(), s.title, 'All job titles')}</select>
+    <select aria-label="Job title" data-chg="rof" data-k="title">${opt([...new Set(APP.db.employees.filter(e => !e.archived && e.status === 'Active' && e.title && (!s.etype || e.type === s.etype)).map(e => e.title))].sort(), s.title, s.etype === 'inhouse' ? 'All in-house job titles' : s.etype === 'outsourced' ? 'All outsourced job titles' : 'All job titles')}</select>
     <label class="search" style="max-width:220px;min-width:160px"><span class="sr">Search employees</span>${ic('search', 'sm')}<input type="search" placeholder="Search employee" value="${esc(s.q)}" data-chg="rof" data-k="q" data-focus-key="rosearch"></label>
     ${s.avail ? `<span class="chip">Has capacity today<button data-act="roClr" data-k="avail" aria-label="Remove filter">${ic('close', 'sm')}</button></span>` : ''}${s.assigned ? `<span class="chip">Assigned today<button data-act="roClr" data-k="assigned" aria-label="Remove filter">${ic('close', 'sm')}</button></span>` : ''}
   </div>
@@ -2998,7 +2999,7 @@ function empPanel(e) {
 }
 ACT.roMode = el => { VS.ro.mode = el.dataset.v; rerender(); };
 ACT.roNav = el => { const s = VS.ro, d = +el.dataset.d; if (!d) s.anchor = todayISO(); else if (s.mode === 'day') s.anchor = addDays(s.anchor, d); else if (s.mode === 'week') s.anchor = addDays(s.anchor, 7 * d); else if (s.mode === 'timeline') s.anchor = addDays(s.anchor, 28 * d); else { const [y, m] = s.anchor.split('-').map(Number); const nm = new Date(Date.UTC(y, m - 1 + d, 1)); s.anchor = nm.toISOString().slice(0, 10); } rerender(); };
-CHG.rof = el => { VS.ro[el.dataset.k] = el.value; rerender(); };
+CHG.rof = el => { VS.ro[el.dataset.k] = el.value; if (el.dataset.k === 'etype' && VS.ro.title && !APP.db.employees.some(e => !e.archived && e.status === 'Active' && e.title === VS.ro.title && (!el.value || e.type === el.value))) VS.ro.title = ''; rerender(); };
 ACT.roClr = el => { VS.ro[el.dataset.k] = ''; rerender(); };
 ACT.roSel = el => { VS.ro.sel = el.dataset.id; const p = $('#empPanel'); if (p) { p.innerHTML = empPanel(get('employees', el.dataset.id)); $$('.rgrid tr').forEach(tr => tr.classList.toggle('sel', !!tr.querySelector(`[data-id="${el.dataset.id}"]`))); p.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' }); } };
 ACT.roList = el => { VS.ro.list = el.dataset.v; rerender(); };
