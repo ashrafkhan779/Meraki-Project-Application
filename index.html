@@ -574,11 +574,11 @@ const PERMS = [
   ['fld_engineers', 'Field · Project / service engineer', 'Fields'], ['fld_dates', 'Field · Planned & actual dates (PS / PF / start / finish)', 'Fields'], ['fld_completion', 'Field · Completion %', 'Fields'],
   ['fld_poValue', 'Field · PO value (needs View financial data)', 'Fields'], ['fld_costs', 'Field · Planned / actual costs (needs View financial data)', 'Fields'], ['fld_margin', 'Field · Gross profit & margin % (needs View financial data)', 'Fields'],
   ['fld_invoicing', 'Field · Invoiced / received / outstanding (needs View financial data)', 'Fields'],
-  ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
+  ['fld_storeCost', 'Field · Store item unit cost & stock value (opening cost, weighted average, receipt cost)', 'Fields'], ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
 ];
 /* A fine-grained permission a role has never set (older roles, or a role saved before the option existed) inherits its parent. */
 const PERM_PARENT = p => p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
-  : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
+  : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_storeCost' ? ['viewFinancials', 'manageMaster'] : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
 /* money-type fields are only visible with View financial data, whatever the field switch says */
 const PERM_REQUIRES = { fld_poValue: 'viewFinancials', fld_costs: 'viewFinancials', fld_margin: 'viewFinancials', fld_invoicing: 'viewFinancials', set_users: 'manageUsers' };
 function roleHas(r, p) {
@@ -1067,7 +1067,7 @@ const API = {
     need('manageMaster'); const item = get('inventoryItems', itemId); const e = {}; const d = { ...d0 };
     vNum(d, 'qty', 'Quantity', { min: 0, req: true }, e); vNum(d, 'unitCost', 'Unit cost', { min: 0, req: true }, e); if (d.qty === 0) e.qty = 'Must be > 0';
     vDate(d, 'receiptDate', 'Receipt date', true, e); if (d.supplierId && !get('suppliers', d.supplierId)) e.supplierId = 'Unknown supplier'; done(e);
-    if (!can('viewCostRates') && !can('editFinancials')) deny('Receiving stock at cost requires financial permissions.');
+    if (!can('fld_storeCost')) deny('Receiving stock at cost needs the “Store item unit cost” field permission.');
     return tx(() => {
       const b = clone(item); const q0 = num(item.qtyOnHand), c0 = num(item.avgCost);
       item.avgCost = Math.round(((q0 * c0 + d.qty * d.unitCost) / (q0 + d.qty)) * 10000) / 10000; item.qtyOnHand = r2(q0 + d.qty); stampUpd(item);
@@ -2951,7 +2951,7 @@ ACT.addTransfer = el => {
   const job = get('jobs', el.dataset.job); const items = live('inventoryItems').filter(i => i.status !== 'Inactive');
   const sugg = `ST-${todayISO().slice(0, 4)}-${String(APP.db.inventoryTransfers.length + 1).padStart(4, '0')}`;
   const fields = [
-    { k: 'itemId', label: 'Material item (SKU · on hand · store cost)', type: 'select', req: true, span: 12, options: items.map(i => [i.id, `${i.sku} · ${i.name} · ${fmtN(i.qtyOnHand, 2)} ${i.uom} on hand${can('viewFinancials') ? ' · ' + fmtN(i.avgCost) + ' avg' : ''}`]) },
+    { k: 'itemId', label: 'Material item (SKU · on hand · store cost)', type: 'select', req: true, span: 12, options: items.map(i => [i.id, `${i.sku} · ${i.name} · ${fmtN(i.qtyOnHand, 2)} ${i.uom} on hand${can('fld_storeCost') ? ' · ' + fmtN(i.avgCost) + ' avg' : ''}`]) },
     { k: 'qty', label: 'Quantity transferred', type: 'number', min: 0, req: true, span: 4 }, { k: 'transferDate', label: 'Transfer date', type: 'date', req: true, span: 4 },
     { k: 'ref', label: 'Transfer reference no.', req: true, span: 4, hint: 'Unique — prevents double charging' },
     { k: 'issuedBy', label: 'Issued by', req: true, span: 6 }, { k: 'receivedBy', label: 'Received by', req: true, span: 6 },
@@ -3233,8 +3233,8 @@ const MASTER = {
   },
   items: {
     label: 'Store items', one: 'store item', icon: 'package', table: 'inventoryItems',
-    cols: [{ k: 'sku', label: 'SKU', fmt: r => `<span class="mono">${esc(r.sku)}</span>` }, { k: 'name', label: 'Item', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.category || '')} · ${esc(r.store || '')}</div>` }, { k: 'qtyOnHand', label: 'On hand', r: 1, fmt: r => `${fmtN(r.qtyOnHand, 2)} <span class="faint">${esc(r.uom)}</span>` }, { k: 'avgCost', label: 'Weighted avg. cost', r: 1, fmt: r => money(r.avgCost, { cur: false, dp: 4 }) }, { k: 'value', label: 'Stock value', r: 1, val: r => num(r.qtyOnHand) * num(r.avgCost), fmt: r => money(r2(num(r.qtyOnHand) * num(r.avgCost)), { cur: false }) }],
-    fields: (rec) => [{ k: 'name', label: 'Item name', req: true, span: 8 }, { k: 'sku', label: 'Item / SKU code', req: true, span: 4 }, { k: 'category', label: 'Category', type: 'select', options: APP.db.settings.materialCategories, span: 4 }, { k: 'uom', label: 'Unit', type: 'select', options: APP.db.settings.uoms, span: 4 }, { k: 'store', label: 'Store / warehouse', span: 4 }, { k: 'qtyOnHand', label: 'Opening quantity', type: 'number', min: 0, span: 6, readonly: !!rec, hint: rec ? 'Changed via stock receipts and transfers' : '' }, { k: 'avgCost', label: 'Opening unit cost', type: 'number', min: 0, span: 6, readonly: !!rec, hidden: !can('viewFinancials') }],
+    cols: [{ k: 'sku', label: 'SKU', fmt: r => `<span class="mono">${esc(r.sku)}</span>` }, { k: 'name', label: 'Item', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.category || '')} · ${esc(r.store || '')}</div>` }, { k: 'qtyOnHand', label: 'On hand', r: 1, fmt: r => `${fmtN(r.qtyOnHand, 2)} <span class="faint">${esc(r.uom)}</span>` }, { k: 'avgCost', label: 'Weighted avg. cost', r: 1, fmt: r => can('fld_storeCost') ? fmtN(r.avgCost, 4) : '<span class="faint">•••</span>', val: r => can('fld_storeCost') ? r.avgCost : 0 }, { k: 'value', label: 'Stock value', r: 1, val: r => can('fld_storeCost') ? num(r.qtyOnHand) * num(r.avgCost) : 0, fmt: r => can('fld_storeCost') ? fmtN(r2(num(r.qtyOnHand) * num(r.avgCost))) : '<span class="faint">•••</span>' }],
+    fields: (rec) => [{ k: 'name', label: 'Item name', req: true, span: 8 }, { k: 'sku', label: 'Item / SKU code', req: true, span: 4 }, { k: 'category', label: 'Category', type: 'select', options: APP.db.settings.materialCategories, span: 4 }, { k: 'uom', label: 'Unit', type: 'select', options: APP.db.settings.uoms, span: 4 }, { k: 'store', label: 'Store / warehouse', span: 4 }, { k: 'qtyOnHand', label: 'Opening quantity', type: 'number', min: 0, span: 6, readonly: !!rec, hint: rec ? 'Changed via stock receipts and transfers' : '' }, { k: 'avgCost', label: `Opening unit cost (${APP.db.settings.currency})`, type: 'number', min: 0, span: 6, readonly: !!rec, hidden: !can('fld_storeCost'), hint: rec ? 'Weighted average — changes via stock receipts' : 'Cost per unit of the opening stock' }],
     extra: r => can('manageMaster') ? `<button class="btn sm" data-act="rcv" data-id="${r.id}">Receive</button>` : '',
   },
 };
@@ -3287,17 +3287,17 @@ ACT.rcv = el => {
   const last = APP.db.stockReceipts.filter(r => r.itemId === it.id && !r.archived).sort(by('receiptDate', -1)).slice(0, 5);
   modalForm({
     title: `Receive stock · ${esc(it.sku)}`, size: 'wide',
-    intro: `<p class="small muted">On hand ${fmtN(it.qtyOnHand, 2)} ${esc(it.uom)} at ${can('viewFinancials') ? fmtN(it.avgCost, 4) : '•••'} average. The weighted-average cost is recalculated; past transfers keep their cost.</p>`,
+    intro: `<p class="small muted">On hand ${fmtN(it.qtyOnHand, 2)} ${esc(it.uom)} at ${can('fld_storeCost') ? fmtN(it.avgCost, 4) : '•••'} average. The weighted-average cost is recalculated; past transfers keep their cost.</p>`,
     fields: [
       { k: 'receiptDate', label: 'Date received', type: 'date', req: true, span: 4 },
       { k: 'supplierId', label: 'Supplier', type: 'select', options: sups.map(x => [x.id, x.name]), span: 8, placeholder: '— Select supplier —' },
       { k: 'grnNo', label: 'GRN #', span: 4, hint: 'Goods receipt note number' }, { k: 'lpoNo', label: 'LPO #', span: 4, hint: 'Your purchase order to the supplier' }, { k: 'ref', label: 'Supplier invoice / delivery note', span: 4 },
       { k: 'qty', label: `Quantity received (${esc(it.uom)})`, type: 'number', min: 0, req: true, span: 4 }, { k: 'unitCost', label: `Unit cost (${esc(APP.db.settings.currency)})`, type: 'number', min: 0, req: true, span: 4 },
       { k: '_prev', type: 'html', span: 4, html: '<div class="alert info" id="rcvPrev" style="margin:0;height:100%"></div>' },
-      ...(last.length ? [{ k: '_hist', type: 'html', span: 12, html: `<div class="small muted" style="margin-top:4px"><b>Recent receipts</b><table class="dt" style="margin-top:6px"><thead><tr><th>Date</th><th>Supplier</th><th>GRN #</th><th>LPO #</th><th class="r">Qty</th><th class="r">Unit cost</th></tr></thead><tbody>${last.map(r => `<tr><td>${fmtDate(r.receiptDate)}</td><td>${esc(nameOf('suppliers', r.supplierId) || '—')}</td><td class="mono">${esc(r.grnNo || r.ref || '—')}</td><td class="mono">${esc(r.lpoNo || '—')}</td><td class="r">${fmtN(r.qty, 2)}</td><td class="r">${can('viewFinancials') ? fmtN(r.unitCost, 4) : '•••'}</td></tr>`).join('')}</tbody></table></div>` }] : []),
+      ...(last.length ? [{ k: '_hist', type: 'html', span: 12, html: `<div class="small muted" style="margin-top:4px"><b>Recent receipts</b><table class="dt" style="margin-top:6px"><thead><tr><th>Date</th><th>Supplier</th><th>GRN #</th><th>LPO #</th><th class="r">Qty</th><th class="r">Unit cost</th></tr></thead><tbody>${last.map(r => `<tr><td>${fmtDate(r.receiptDate)}</td><td>${esc(nameOf('suppliers', r.supplierId) || '—')}</td><td class="mono">${esc(r.grnNo || r.ref || '—')}</td><td class="mono">${esc(r.lpoNo || '—')}</td><td class="r">${fmtN(r.qty, 2)}</td><td class="r">${can('fld_storeCost') ? fmtN(r.unitCost, 4) : '•••'}</td></tr>`).join('')}</tbody></table></div>` }] : []),
     ],
     values: { receiptDate: todayISO() },
-    onChange(v, el) { const p = $('#rcvPrev', el); if (!p) return; const q0 = num(it.qtyOnHand), c0 = num(it.avgCost), q = num(v.qty), c = num(v.unitCost); const avg = q0 + q > 0 ? (q0 * c0 + q * c) / (q0 + q) : c0; p.innerHTML = `${ic('info', 'sm')} Value <b>${moneyTxt(r2(q * c))}</b><div class="small">New on hand ${fmtN(q0 + q, 2)} ${esc(it.uom)}${can('viewFinancials') ? ` · new avg. ${fmtN(avg, 4)}` : ''}</div>`; },
+    onChange(v, el) { const p = $('#rcvPrev', el); if (!p) return; const q0 = num(it.qtyOnHand), c0 = num(it.avgCost), q = num(v.qty), c = num(v.unitCost); const avg = q0 + q > 0 ? (q0 * c0 + q * c) / (q0 + q) : c0; p.innerHTML = `${ic('info', 'sm')} Value <b>${esc(APP.db.settings.currency)} ${fmtN(r2(q * c))}</b><div class="small">New on hand ${fmtN(q0 + q, 2)} ${esc(it.uom)} · new avg. ${fmtN(avg, 4)}</div>`; },
     onSubmit(v) { delete v._prev; delete v._hist; API.receiveStock(it.id, v); toast('Stock received'); rerender(); },
   });
 };
