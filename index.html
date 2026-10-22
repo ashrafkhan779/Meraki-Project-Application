@@ -391,6 +391,10 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .tt-comp td{background:#FAFBFE}.tt-comp td:first-child b{color:var(--accent)}
 .tt-job td{background:#fff}
 
+/* multi-item purchase form */
+.pi-table td{padding:6px 6px;vertical-align:middle}.pi-table th{white-space:nowrap}.pi-table input,.pi-table select{width:100%;min-width:0;margin:0}.pi-table input.invalid,.pi-table select.invalid{border-color:var(--danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger) 25%,transparent)}.pi-table .pi-total{font-family:var(--f-num)}
+.pi-table tfoot td{border-top:1px solid var(--rule);padding-top:10px}
+
 </style>
 </head>
 <body>
@@ -527,7 +531,7 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 <div id="app"><div class="boot"><div class="card" style="padding:24px">Loading JobOps…</div></div></div>
 <noscript>JobOps needs JavaScript enabled.</noscript>
 <script>
-const SPEC = {"customers":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["trn","text",0],["paymentTerms","text",0],["creditLimit","num",0],["zohoCustomerId","text",0],["notes","text",0],["status","text",0]],"endClients":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["customerIds","arr",0],["notes","text",0],["status","text",0]],"suppliers":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["trn","text",0],["paymentTerms","text",0],["category","text",0],["notes","text",0],["status","text",0]],"employees":[["id","text",1],["code","text",1],["name","text",1],["type","text",1],["phone","text",0],["email","text",0],["category","text",1],["title","text",0],["department","text",0],["joiningDate","date",0],["status","text",0],["notes","text",0],["employmentType","text",0],["stdHoursPerDay","num",0],["costRate","num",0],["skills","text",0],["supplierId","text",0,"suppliers"],["rateBasis","text",0],["agreedRate","num",0],["capacityPct","num",0],["contractStart","date",0],["contractEnd","date",0]],"leaves":[["id","text",1],["employeeId","text",1,"employees"],["fromDate","date",1],["toDate","date",1],["type","text",0],["notes","text",0]],"inventoryItems":[["id","text",1],["sku","text",1],["name","text",1],["uom","text",0],["category","text",0],["store","text",0],["qtyOnHand","num",0],["avgCost","num",0],["status","text",0]],"stockReceipts":[["id","text",1],["itemId","text",1,"inventoryItems"],["receiptDate","date",0],["qty","num",0],["unitCost","num",0],["ref","text",0]],"jobs":[["id","text",1],["jobNo","text",1],["type","text",1],["openingDate","date",1],["customerId","text",0,"customers"],["endClientId","text",0,"endClients"],["zohoSo","text",0],["zohoSoId","text",0],["description","text",0],["status","text",1],["completionPct","num",0],["lpoDate","date",0],["customerOrderNo","text",0],["poValue","num",0],["actualPoValue","num",0],["psDate","date",0],["pfDate","date",0],["actualStart","date",0],["actualFinish","date",0],["projectEngineerId","text",0,"employees"],["serviceEngineerId","text",0,"employees"],["comments","text",0],["locked","bool",0],["closureDate","date",0],["closureComments","text",0],["closedBy","text",0,"users"],["closedAt","ts",0]],"plannedManpower":[["id","text",1],["jobId","text",1,"jobs"],["employeeId","text",0,"employees"],["resourceName","text",0],["resourceType","text",0],["supplierId","text",0,"suppliers"],["headcount","num",0],["hoursPerPerson","num",0],["days","num",0],["rate","num",0],["startDate","date",0],["endDate","date",0],["comments","text",0],["assignmentId","text",0,"assignments"]],"actualManpower":[["id","text",1],["jobId","text",1,"jobs"],["employeeId","text",0,"employees"],["resourceName","text",0],["resourceType","text",0],["supplierId","text",0,"suppliers"],["headcount","num",0],["hoursPerPerson","num",0],["days","num",0],["rate","num",0],["dateFrom","date",0],["dateTo","date",0],["comments","text",0],["assignmentId","text",0,"assignments"]],"assignments":[["id","text",1],["employeeId","text",1,"employees"],["jobId","text",1,"jobs"],["startDate","date",1],["endDate","date",1],["plannedHours","num",0],["allocationPct","num",0],["status","text",0],["comments","text",0],["overrideBy","text",0,"users"],["overrideReason","text",0]],"plannedMaterials":[["id","text",1],["jobId","text",1,"jobs"],["description","text",0],["category","text",0],["supplierId","text",0,"suppliers"],["qty","num",0],["uom","text",0],["unitPrice","num",0],["expectedDate","date",0],["comments","text",0]],"actualMaterials":[["id","text",1],["jobId","text",1,"jobs"],["description","text",0],["category","text",0],["supplierId","text",0,"suppliers"],["qty","num",0],["uom","text",0],["unitPrice","num",0],["purchaseDate","date",0],["poNo","text",0],["supplierRef","text",0],["comments","text",0]],"inventoryTransfers":[["id","text",1],["jobId","text",1,"jobs"],["itemId","text",1,"inventoryItems"],["qty","num",0],["uom","text",0],["transferDate","date",0],["issuedBy","text",0],["receivedBy","text",0],["store","text",0],["costingMethod","text",0],["unitCost","num",0],["costSource","text",0],["ref","text",1],["status","text",0],["comments","text",0]],"plannedMisc":[["id","text",1],["jobId","text",1,"jobs"],["category","text",0],["description","text",0],["supplierId","text",0,"suppliers"],["payee","text",0],["expenseDate","date",0],["amount","num",0],["comments","text",0]],"actualMisc":[["id","text",1],["jobId","text",1,"jobs"],["category","text",0],["description","text",0],["supplierId","text",0,"suppliers"],["payee","text",0],["expenseDate","date",0],["amount","num",0],["paymentMode","text",0],["paymentRef","text",0],["attachmentName","text",0],["comments","text",0]],"miscPayments":[["id","text",1],["miscId","text",1,"actualMisc"],["payDate","date",0],["amount","num",0],["mode","text",0],["ref","text",0]],"invoices":[["id","text",1],["jobId","text",1,"jobs"],["invoiceNo","text",1],["invoiceDate","date",0],["dueDate","date",0],["amount","num",0],["status","text",0],["zohoInvoiceId","text",0],["notes","text",0]],"invoicePayments":[["id","text",1],["invoiceId","text",1,"invoices"],["payDate","date",0],["amount","num",0],["mode","text",0],["ref","text",0],["zohoPaymentId","text",0]],"jobStatusHistory":[["id","text",1],["jobId","text",1,"jobs"],["fromStatus","text",0],["toStatus","text",0],["at","ts",0],["userId","text",0,"users"],["note","text",0]],"poRevisions":[["id","text",1],["jobId","text",1,"jobs"],["field","text",0],["fromValue","num",0],["toValue","num",0],["at","ts",0],["userId","text",0,"users"],["reason","text",0]],"jobComments":[["id","text",1],["jobId","text",1,"jobs"],["userId","text",0,"users"],["at","ts",0],["text","text",0]],"jobAttachments":[["id","text",1],["jobId","text",1,"jobs"],["name","text",0],["size","int",0],["mime","text",0],["at","ts",0],["userId","text",0,"users"],["note","text",0]],"closures":[["id","text",1],["jobId","text",1,"jobs"],["closureDate","date",0],["comments","text",0],["finalStatus","text",0],["financialsConfirmed","bool",0],["pendingConfirmed","bool",0],["closedBy","text",0,"users"],["closedAt","ts",0],["reopenedBy","text",0,"users"],["reopenedAt","ts",0],["reopenReason","text",0]],"roles":[["id","text",1],["name","text",1],["system","bool",0],["jobTypes","arr",0],["permissions","json",0]],"users":[["id","text",1],["name","text",1],["email","text",1],["roleId","text",1,"roles"],["department","text",0],["active","bool",0]],"auditLog":[["id","text",1],["at","ts",0],["userId","text",0,"users"],["action","text",0],["entity","text",0],["recordId","text",0],["before","json",0],["after","json",0],["reason","text",0]]};
+const SPEC = {"customers":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["trn","text",0],["paymentTerms","text",0],["creditLimit","num",0],["zohoCustomerId","text",0],["notes","text",0],["status","text",0]],"endClients":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["customerIds","arr",0],["notes","text",0],["status","text",0]],"suppliers":[["id","text",1],["code","text",1],["name","text",1],["contactPerson","text",0],["email","text",0],["phone","text",0],["address","text",0],["trn","text",0],["paymentTerms","text",0],["category","text",0],["notes","text",0],["status","text",0]],"employees":[["id","text",1],["code","text",1],["name","text",1],["type","text",1],["phone","text",0],["email","text",0],["category","text",1],["title","text",0],["department","text",0],["joiningDate","date",0],["status","text",0],["notes","text",0],["employmentType","text",0],["stdHoursPerDay","num",0],["costRate","num",0],["skills","text",0],["supplierId","text",0,"suppliers"],["rateBasis","text",0],["agreedRate","num",0],["capacityPct","num",0],["contractStart","date",0],["contractEnd","date",0]],"leaves":[["id","text",1],["employeeId","text",1,"employees"],["fromDate","date",1],["toDate","date",1],["type","text",0],["notes","text",0]],"inventoryItems":[["id","text",1],["sku","text",1],["name","text",1],["uom","text",0],["category","text",0],["store","text",0],["qtyOnHand","num",0],["avgCost","num",0],["status","text",0]],"stockReceipts":[["id","text",1],["itemId","text",1,"inventoryItems"],["receiptDate","date",0],["supplierId","text",0,"suppliers"],["grnNo","text",0],["lpoNo","text",0],["qty","num",0],["unitCost","num",0],["ref","text",0]],"jobs":[["id","text",1],["jobNo","text",1],["type","text",1],["openingDate","date",1],["customerId","text",0,"customers"],["endClientId","text",0,"endClients"],["zohoSo","text",0],["zohoSoId","text",0],["description","text",0],["status","text",1],["completionPct","num",0],["lpoDate","date",0],["customerOrderNo","text",0],["poValue","num",0],["actualPoValue","num",0],["psDate","date",0],["pfDate","date",0],["actualStart","date",0],["actualFinish","date",0],["projectEngineerId","text",0,"employees"],["serviceEngineerId","text",0,"employees"],["comments","text",0],["locked","bool",0],["closureDate","date",0],["closureComments","text",0],["closedBy","text",0,"users"],["closedAt","ts",0]],"plannedManpower":[["id","text",1],["jobId","text",1,"jobs"],["employeeId","text",0,"employees"],["resourceName","text",0],["resourceType","text",0],["supplierId","text",0,"suppliers"],["headcount","num",0],["hoursPerPerson","num",0],["days","num",0],["rate","num",0],["startDate","date",0],["endDate","date",0],["comments","text",0],["assignmentId","text",0,"assignments"]],"actualManpower":[["id","text",1],["jobId","text",1,"jobs"],["employeeId","text",0,"employees"],["resourceName","text",0],["resourceType","text",0],["supplierId","text",0,"suppliers"],["headcount","num",0],["hoursPerPerson","num",0],["days","num",0],["rate","num",0],["dateFrom","date",0],["dateTo","date",0],["comments","text",0],["assignmentId","text",0,"assignments"]],"assignments":[["id","text",1],["employeeId","text",1,"employees"],["jobId","text",1,"jobs"],["startDate","date",1],["endDate","date",1],["plannedHours","num",0],["allocationPct","num",0],["status","text",0],["comments","text",0],["overrideBy","text",0,"users"],["overrideReason","text",0]],"plannedMaterials":[["id","text",1],["jobId","text",1,"jobs"],["description","text",0],["category","text",0],["supplierId","text",0,"suppliers"],["qty","num",0],["uom","text",0],["unitPrice","num",0],["expectedDate","date",0],["comments","text",0]],"actualMaterials":[["id","text",1],["jobId","text",1,"jobs"],["description","text",0],["category","text",0],["supplierId","text",0,"suppliers"],["qty","num",0],["uom","text",0],["unitPrice","num",0],["purchaseDate","date",0],["poNo","text",0],["supplierRef","text",0],["comments","text",0]],"inventoryTransfers":[["id","text",1],["jobId","text",1,"jobs"],["itemId","text",1,"inventoryItems"],["qty","num",0],["uom","text",0],["transferDate","date",0],["issuedBy","text",0],["receivedBy","text",0],["store","text",0],["costingMethod","text",0],["unitCost","num",0],["costSource","text",0],["ref","text",1],["status","text",0],["comments","text",0]],"plannedMisc":[["id","text",1],["jobId","text",1,"jobs"],["category","text",0],["description","text",0],["supplierId","text",0,"suppliers"],["payee","text",0],["expenseDate","date",0],["amount","num",0],["comments","text",0]],"actualMisc":[["id","text",1],["jobId","text",1,"jobs"],["category","text",0],["description","text",0],["supplierId","text",0,"suppliers"],["payee","text",0],["expenseDate","date",0],["amount","num",0],["paymentMode","text",0],["paymentRef","text",0],["attachmentName","text",0],["comments","text",0]],"miscPayments":[["id","text",1],["miscId","text",1,"actualMisc"],["payDate","date",0],["amount","num",0],["mode","text",0],["ref","text",0]],"invoices":[["id","text",1],["jobId","text",1,"jobs"],["invoiceNo","text",1],["invoiceDate","date",0],["dueDate","date",0],["amount","num",0],["status","text",0],["zohoInvoiceId","text",0],["notes","text",0]],"invoicePayments":[["id","text",1],["invoiceId","text",1,"invoices"],["payDate","date",0],["amount","num",0],["mode","text",0],["ref","text",0],["zohoPaymentId","text",0]],"jobStatusHistory":[["id","text",1],["jobId","text",1,"jobs"],["fromStatus","text",0],["toStatus","text",0],["at","ts",0],["userId","text",0,"users"],["note","text",0]],"poRevisions":[["id","text",1],["jobId","text",1,"jobs"],["field","text",0],["fromValue","num",0],["toValue","num",0],["at","ts",0],["userId","text",0,"users"],["reason","text",0]],"jobComments":[["id","text",1],["jobId","text",1,"jobs"],["userId","text",0,"users"],["at","ts",0],["text","text",0]],"jobAttachments":[["id","text",1],["jobId","text",1,"jobs"],["name","text",0],["size","int",0],["mime","text",0],["at","ts",0],["userId","text",0,"users"],["note","text",0]],"closures":[["id","text",1],["jobId","text",1,"jobs"],["closureDate","date",0],["comments","text",0],["finalStatus","text",0],["financialsConfirmed","bool",0],["pendingConfirmed","bool",0],["closedBy","text",0,"users"],["closedAt","ts",0],["reopenedBy","text",0,"users"],["reopenedAt","ts",0],["reopenReason","text",0]],"roles":[["id","text",1],["name","text",1],["system","bool",0],["jobTypes","arr",0],["permissions","json",0]],"users":[["id","text",1],["name","text",1],["email","text",1],["roleId","text",1,"roles"],["department","text",0],["active","bool",0]],"auditLog":[["id","text",1],["at","ts",0],["userId","text",0,"users"],["action","text",0],["entity","text",0],["recordId","text",0],["before","json",0],["after","json",0],["reason","text",0]]};
 const DEFAULT_SETTINGS = {"companyName": "Your Company LLC", "logoText": "JO", "currency": "AED", "precision": 2, "locale": "en-AE", "jobNumber": {"prefix": "JOB", "pattern": "{PREFIX}-{TYPE}-{YYYY}-{SEQ}", "padding": 4, "nextSeq": 1, "typeCodes": {"Service": "SRV", "Supply": "SUP", "Supply/Services": "SSV"}}, "jobStatuses": ["Planned", "In Progress", "On Hold", "Completed", "Closed", "Cancelled"], "expenseCategories": ["Transportation", "Accommodation", "Permits & Gate Passes", "Equipment Rental", "Delivery", "Parking & Tolls", "Meals", "Other"], "materialCategories": ["Consumables", "Spare Parts", "Electrical", "Mechanical", "Piping & Valves", "Safety / PPE", "Tools", "Other"], "paymentModes": ["Cash", "Bank Transfer", "Company Card", "Cheque", "Other"], "uoms": ["EA", "PCS", "SET", "M", "KG", "L", "BOX", "LOT"], "departments": ["Operations", "Projects", "Workshop", "Logistics", "Finance", "HR", "Management"], "workingDays": [1, 2, 3, 4, 5], "hoursPerDay": 8, "timezone": "Asia/Dubai", "fiscalYearStartMonth": 1, "revenueRule": "po_value", "inventoryCosting": "weighted_average", "suggest100OnCompleted": true, "schemaVersion": 2, "gpWarnPct": 15, "attachmentLimitMb": 10, "notifyOnClose": true, "notifyOnOverbook": true, "exportRequiresPermission": true};
 const DEFAULT_ROLES = [{"id":"role_super","name":"Super Admin","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":true,"viewSettings":true,"jobCreate":true,"quickAddMaster":true,"jobEdit":true,"jobDelete":true,"viewFinancials":true,"editFinancials":true,"viewCostRates":true,"manageManpower":true,"manageMaterials":true,"manageMisc":true,"changeInvoiceStatus":true,"recordPayments":true,"closeJobs":true,"reopenJobs":true,"editClosedJobs":true,"exportReports":true,"manageMaster":true,"rosterAssign":true,"overrideConflicts":true,"manageUsers":true,"manageSettings":true}},{"id":"role_admin","name":"Administrator","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":true,"viewSettings":true,"jobCreate":true,"quickAddMaster":true,"jobEdit":true,"jobDelete":true,"viewFinancials":true,"editFinancials":true,"viewCostRates":true,"manageManpower":true,"manageMaterials":true,"manageMisc":true,"changeInvoiceStatus":true,"recordPayments":true,"closeJobs":true,"reopenJobs":true,"editClosedJobs":true,"exportReports":true,"manageMaster":true,"rosterAssign":true,"overrideConflicts":true,"manageUsers":true,"manageSettings":true}},{"id":"role_mgmt","name":"Management","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":true,"viewSettings":false,"jobCreate":false,"quickAddMaster":false,"jobEdit":false,"jobDelete":false,"viewFinancials":true,"editFinancials":false,"viewCostRates":true,"manageManpower":false,"manageMaterials":false,"manageMisc":false,"changeInvoiceStatus":false,"recordPayments":false,"closeJobs":false,"reopenJobs":false,"editClosedJobs":false,"exportReports":true,"manageMaster":false,"rosterAssign":false,"overrideConflicts":false,"manageUsers":false,"manageSettings":false}},{"id":"role_fin","name":"Finance / Accounts","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":true,"viewSettings":false,"jobCreate":false,"quickAddMaster":false,"jobEdit":false,"jobDelete":false,"viewFinancials":true,"editFinancials":true,"viewCostRates":true,"manageManpower":false,"manageMaterials":false,"manageMisc":true,"changeInvoiceStatus":true,"recordPayments":true,"closeJobs":true,"reopenJobs":false,"editClosedJobs":false,"exportReports":true,"manageMaster":false,"rosterAssign":false,"overrideConflicts":false,"manageUsers":false,"manageSettings":false}},{"id":"role_pm","name":"Project Manager","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":true,"viewSettings":false,"jobCreate":true,"quickAddMaster":true,"jobEdit":true,"jobDelete":false,"viewFinancials":true,"editFinancials":true,"viewCostRates":false,"manageManpower":true,"manageMaterials":true,"manageMisc":true,"changeInvoiceStatus":false,"recordPayments":false,"closeJobs":false,"reopenJobs":false,"editClosedJobs":false,"exportReports":true,"manageMaster":false,"rosterAssign":true,"overrideConflicts":false,"manageUsers":false,"manageSettings":false}},{"id":"role_ops","name":"Operations","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":false,"viewSettings":false,"jobCreate":false,"quickAddMaster":false,"jobEdit":true,"jobDelete":false,"viewFinancials":false,"editFinancials":false,"viewCostRates":false,"manageManpower":false,"manageMaterials":true,"manageMisc":true,"changeInvoiceStatus":false,"recordPayments":false,"closeJobs":false,"reopenJobs":false,"editClosedJobs":false,"exportReports":false,"manageMaster":false,"rosterAssign":false,"overrideConflicts":false,"manageUsers":false,"manageSettings":false}},{"id":"role_hr","name":"HR / Resource Planner","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":true,"viewReports":false,"viewSettings":false,"jobCreate":false,"quickAddMaster":false,"jobEdit":false,"jobDelete":false,"viewFinancials":false,"editFinancials":false,"viewCostRates":false,"manageManpower":true,"manageMaterials":false,"manageMisc":false,"changeInvoiceStatus":false,"recordPayments":false,"closeJobs":false,"reopenJobs":false,"editClosedJobs":false,"exportReports":false,"manageMaster":true,"rosterAssign":true,"overrideConflicts":true,"manageUsers":false,"manageSettings":false}},{"id":"role_ro","name":"Read-Only User","system":true,"jobTypes":["Service","Supply","Supply/Services"],"permissions":{"viewOverview":true,"viewJobs":true,"viewRoster":true,"viewMaster":false,"viewReports":true,"viewSettings":false,"jobCreate":false,"quickAddMaster":false,"jobEdit":false,"jobDelete":false,"viewFinancials":false,"editFinancials":false,"viewCostRates":false,"manageManpower":false,"manageMaterials":false,"manageMisc":false,"changeInvoiceStatus":false,"recordPayments":false,"closeJobs":false,"reopenJobs":false,"editClosedJobs":false,"exportReports":false,"manageMaster":false,"rosterAssign":false,"overrideConflicts":false,"manageUsers":false,"manageSettings":false}}];
 /* =====================================================================
@@ -553,7 +557,37 @@ const PERMS = [
   ['exportReports', 'Export data & reports', 'Data'], ['manageMaster', 'Manage master data', 'Data'],
   ['rosterAssign', 'Assign employees (roster)', 'Roster'], ['overrideConflicts', 'Override roster conflicts', 'Roster'],
   ['manageUsers', 'Manage users & roles', 'Admin'], ['manageSettings', 'Change application settings', 'Admin'],
+  /* --- fine-grained: tabs / sections (inherit the parent tab permission when a role has not set them) --- */
+  ['jobTab_manpower', 'Job · Manpower tab', 'Job tabs'], ['jobTab_materials', 'Job · Materials tab', 'Job tabs'], ['jobTab_misc', 'Job · Miscellaneous tab', 'Job tabs'],
+  ['jobTab_financials', 'Job · Financial summary tab', 'Job tabs'], ['jobTab_invoices', 'Job · Invoices & payments tab', 'Job tabs'], ['jobTab_notes', 'Job · Comments & files tab', 'Job tabs'], ['jobTab_history', 'Job · Audit history tab', 'Job tabs'],
+  ['master_customers', 'Master · Companies / customers', 'Master data tabs'], ['master_endClients', 'Master · End-clients', 'Master data tabs'], ['master_suppliers', 'Master · Suppliers', 'Master data tabs'],
+  ['master_inhouse', 'Master · Employees · in-house', 'Master data tabs'], ['master_outsourced', 'Master · Employees · outsourced', 'Master data tabs'], ['master_items', 'Master · Store items', 'Master data tabs'],
+  ['report_register', 'Report · Job register', 'Reports'], ['report_status', 'Report · Job status', 'Reports'], ['report_pva', 'Report · Planned vs actual cost', 'Reports'], ['report_gp', 'Report · Job-wise GP', 'Reports'],
+  ['report_customer', 'Report · Customer-wise profitability', 'Reports'], ['report_endclient', 'Report · End-client-wise profitability', 'Reports'], ['report_supplier', 'Report · Supplier-wise cost', 'Reports'],
+  ['report_manpower', 'Report · Manpower utilisation', 'Reports'], ['report_allocation', 'Report · Employee allocation', 'Reports'], ['report_materials', 'Report · Material cost', 'Reports'], ['report_misc', 'Report · Miscellaneous expenses', 'Reports'],
+  ['report_receivables', 'Report · Invoice & receivables', 'Reports'], ['report_closed', 'Report · Closed jobs', 'Reports'], ['report_monthly', 'Report · Monthly financial summary', 'Reports'],
+  ['set_general', 'Settings · Company & finance', 'Settings tabs'], ['set_numbering', 'Settings · Job numbering', 'Settings tabs'], ['set_lists', 'Settings · Statuses & categories', 'Settings tabs'], ['set_calendar', 'Settings · Working calendar', 'Settings tabs'],
+  ['set_prefs', 'Settings · Notifications, files & export', 'Settings tabs'], ['set_users', 'Settings · Users', 'Settings tabs'], ['set_roles', 'Settings · Roles & permissions', 'Settings tabs'], ['set_audit', 'Settings · Audit log', 'Settings tabs'],
+  ['set_data', 'Settings · Data & integrations', 'Settings tabs'], ['set_tests', 'Settings · Acceptance tests', 'Settings tabs'],
+  /* --- fine-grained: fields / columns --- */
+  ['fld_zohoSo', 'Field · Zoho SO #', 'Fields'], ['fld_customerOrderNo', 'Field · Customer order # & LPO date', 'Fields'], ['fld_endClient', 'Field · End-client', 'Fields'],
+  ['fld_engineers', 'Field · Project / service engineer', 'Fields'], ['fld_dates', 'Field · Planned & actual dates (PS / PF / start / finish)', 'Fields'], ['fld_completion', 'Field · Completion %', 'Fields'],
+  ['fld_poValue', 'Field · PO value (needs View financial data)', 'Fields'], ['fld_costs', 'Field · Planned / actual costs (needs View financial data)', 'Fields'], ['fld_margin', 'Field · Gross profit & margin % (needs View financial data)', 'Fields'],
+  ['fld_invoicing', 'Field · Invoiced / received / outstanding (needs View financial data)', 'Fields'],
+  ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
 ];
+/* A fine-grained permission a role has never set (older roles, or a role saved before the option existed) inherits its parent. */
+const PERM_PARENT = p => p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
+  : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
+/* money-type fields are only visible with View financial data, whatever the field switch says */
+const PERM_REQUIRES = { fld_poValue: 'viewFinancials', fld_costs: 'viewFinancials', fld_margin: 'viewFinancials', fld_invoicing: 'viewFinancials', set_users: 'manageUsers' };
+function roleHas(r, p) {
+  if (!r || !r.permissions) return false;
+  const req = PERM_REQUIRES[p]; if (req && !roleHas(r, req)) return false;
+  const v = r.permissions[p];
+  if (v === undefined) { const par = PERM_PARENT(p); return par ? (Array.isArray(par) ? par.some(x => roleHas(r, x)) : roleHas(r, par)) : false; }
+  return !!v;
+}
 const COST_PERM = {
   plannedManpower: 'manageManpower', actualManpower: 'manageManpower', plannedMaterials: 'manageMaterials',
   actualMaterials: 'manageMaterials', inventoryTransfers: 'manageMaterials', plannedMisc: 'manageMisc', actualMisc: 'manageMisc',
@@ -636,7 +670,7 @@ const allStatuses = () => (APP.db?.settings?.jobStatuses || []).slice();
 const activeStatuses = () => allStatuses().filter(s => !END_ST.includes(s));
 const defaultStatus = () => activeStatuses()[0] || allStatuses()[0] || 'Planned';
 const isSuperAdmin = () => !!APP.user && APP.user.roleId === 'role_super';
-function can(p) { const r = roleOf(APP.user); return !!(r && r.permissions && r.permissions[p]); }
+function can(p) { return roleHas(roleOf(APP.user), p); }
 function canType(type) { const r = roleOf(APP.user); return !!r && (!r.jobTypes || !r.jobTypes.length || r.jobTypes.includes(type)); }
 function need(p, msg) { if (!APP.user || !APP.user.active) deny('No active user session.'); if (!can(p)) deny(msg || `Permission required: ${PERMS.find(x => x[0] === p)?.[1] || p}`); }
 function needJobAccess(job) { if (!job) invalid('Job not found.'); if (!canType(job.type)) deny(`Your role has no access to ${job.type} jobs.`); }
@@ -978,6 +1012,19 @@ const API = {
       const rec = stampNew({ ...d, id: uid(t.slice(0, 3)) }); APP.db[t].push(rec); audit('create', t, rec.id, null, rec, reason, job.id); return rec;
     });
   },
+  /* one purchase (vendor, date, PO #, invoice ref, comments) with many material items → one actualMaterials line per item, saved together */
+  addPurchase(jobId, head, items, reason, token) {
+    need('manageMaterials'); const job = get('jobs', jobId); needJobAccess(job); needUnlocked(job, reason); once(token);
+    const e = {}; const h = { ...head }; vDate(h, 'purchaseDate', 'Purchase date', true, e); if (h.supplierId && !get('suppliers', h.supplierId)) e.supplierId = 'Unknown supplier';
+    const rows = (items || []).filter(it => (it.description || '').trim() || isNum(it.qty) || isNum(it.unitPrice));
+    if (!rows.length) e.items = 'Add at least one material item';
+    rows.forEach((it, i) => { if (!(it.description || '').trim()) e['i_description_' + i] = 'Material required'; if (!isNum(it.qty) || +it.qty <= 0) e['i_qty_' + i] = 'Qty > 0'; if (!isNum(it.unitPrice) || +it.unitPrice < 0) e['i_unitPrice_' + i] = 'Unit price required'; });
+    done(e);
+    return used(token, tx(() => rows.map(it => {
+      const d = API.validateLine('actualMaterials', { jobId: job.id, supplierId: h.supplierId || null, purchaseDate: h.purchaseDate, poNo: (h.poNo || '').trim(), supplierRef: (h.supplierRef || '').trim(), comments: (h.comments || '').trim(), description: it.description.trim(), category: it.category || '', qty: it.qty, uom: it.uom || '', unitPrice: it.unitPrice });
+      const rec = stampNew({ ...d, id: uid('act') }); APP.db.actualMaterials.push(rec); audit('create', 'actualMaterials', rec.id, null, rec, reason, job.id); return rec;
+    })));
+  },
   deleteLine(t, id, reason) {
     const rec = get(t, id); if (!rec) invalid('Line not found.');
     need(COST_PERM[t]); const job = get('jobs', rec.jobId); needJobAccess(job); needUnlocked(job, reason);
@@ -1016,15 +1063,16 @@ const API = {
     if (!reason) invalid('Reason required to reverse a transfer.', { reason: 'Required' });
     return tx(() => { const b = clone(rec); rec.status = 'Reversed'; stampUpd(rec); const item = get('inventoryItems', rec.itemId); if (item) { item.qtyOnHand = r2(num(item.qtyOnHand) + num(rec.qty)); stampUpd(item); } audit('reverse', 'inventoryTransfers', id, b, rec, reason, job.id); });
   },
-  receiveStock(itemId, qty, unitCost, ref) {
-    need('manageMaster'); const item = get('inventoryItems', itemId); const e = {}; const d = { qty, unitCost };
-    vNum(d, 'qty', 'Quantity', { min: 0, req: true }, e); vNum(d, 'unitCost', 'Unit cost', { min: 0, req: true }, e); if (d.qty === 0) e.qty = 'Must be > 0'; done(e);
+  receiveStock(itemId, d0) {
+    need('manageMaster'); const item = get('inventoryItems', itemId); const e = {}; const d = { ...d0 };
+    vNum(d, 'qty', 'Quantity', { min: 0, req: true }, e); vNum(d, 'unitCost', 'Unit cost', { min: 0, req: true }, e); if (d.qty === 0) e.qty = 'Must be > 0';
+    vDate(d, 'receiptDate', 'Receipt date', true, e); if (d.supplierId && !get('suppliers', d.supplierId)) e.supplierId = 'Unknown supplier'; done(e);
     if (!can('viewCostRates') && !can('editFinancials')) deny('Receiving stock at cost requires financial permissions.');
     return tx(() => {
       const b = clone(item); const q0 = num(item.qtyOnHand), c0 = num(item.avgCost);
       item.avgCost = Math.round(((q0 * c0 + d.qty * d.unitCost) / (q0 + d.qty)) * 10000) / 10000; item.qtyOnHand = r2(q0 + d.qty); stampUpd(item);
-      APP.db.stockReceipts.push(stampNew({ id: uid('rcv'), itemId, receiptDate: todayISO(), qty: d.qty, unitCost: d.unitCost, ref: ref || '' }));
-      audit('update', 'inventoryItems', itemId, b, item, 'Stock receipt ' + (ref || ''));
+      const rc = stampNew({ id: uid('rcv'), itemId, receiptDate: d.receiptDate, supplierId: d.supplierId || null, grnNo: (d.grnNo || '').trim(), lpoNo: (d.lpoNo || '').trim(), qty: d.qty, unitCost: d.unitCost, ref: (d.ref || '').trim() });
+      APP.db.stockReceipts.push(rc); audit('update', 'inventoryItems', itemId, b, item, `Stock receipt ${rc.grnNo || rc.ref || ''}`.trim()); return rc;
     });
   },
 
@@ -2384,21 +2432,25 @@ function filterJobs(type, s) {
     && (!q || jobSearchText(j).includes(q)));
 }
 const JOB_COLS = () => {
-  const f = can('viewFinancials');
+  const f = can('viewFinancials'); const F = k => can('fld_' + k);
   return [
     { k: 'jobNo', label: 'Job no.', fmt: j => `<a class="jobno" href="#/job/${j.id}">${esc(j.jobNo)}</a>`, val: j => j.jobNo },
-    { k: 'zohoSo', label: 'Zoho SO #', fmt: j => j.zohoSo ? `<span class="mono">${esc(j.zohoSo)}</span>` : '<span class="faint">—</span>' },
+    ...(F('zohoSo') ? [{ k: 'zohoSo', label: 'Zoho SO #', fmt: j => j.zohoSo ? `<span class="mono">${esc(j.zohoSo)}</span>` : '<span class="faint">—</span>' }] : []),
     { k: 'openingDate', label: 'Opened', fmt: j => `<span class="nowrap">${fmtDate(j.openingDate)}</span>` },
-    { k: 'company', label: 'Company / end-client', fmt: j => `<b style="font-weight:600">${esc(nameOf('customers', j.customerId))}</b><div class="small faint">${esc(nameOf('endClients', j.endClientId) || '—')}</div>`, val: j => nameOf('customers', j.customerId) },
+    { k: 'company', label: F('endClient') ? 'Company / end-client' : 'Company', fmt: j => `<b style="font-weight:600">${esc(nameOf('customers', j.customerId))}</b>${F('endClient') ? `<div class="small faint">${esc(nameOf('endClients', j.endClientId) || '—')}</div>` : ''}`, val: j => nameOf('customers', j.customerId) },
     { k: 'description', label: 'Description', cls: 'desc', fmt: j => `<span title="${esc(j.description)}">${esc(j.description)}</span>`, nosort: 1 },
-    { k: 'status', label: 'Status', fmt: j => `${statusBadge(j.status)}${j.locked ? ' ' + ic('lock', 'sm') : ''}<div class="small faint">${num(j.completionPct)}% complete</div>` },
-    ...(f ? [
+    { k: 'status', label: 'Status', fmt: j => `${statusBadge(j.status)}${j.locked ? ' ' + ic('lock', 'sm') : ''}${F('completion') ? `<div class="small faint">${num(j.completionPct)}% complete</div>` : ''}` },
+    ...(f && F('poValue') ? [
       { k: 'poValue', label: 'PO value', r: 1, fmt: j => money(Calc.job(j).actualPO, { cur: false }), val: j => Calc.job(j).actualPO },
+    ] : []),
+    ...(f && F('costs') ? [
       { k: 'pcost', label: 'Plan / actual cost', r: 1, fmt: j => { const x = Calc.job(j); return `${fmtN(x.plannedCost)}<div class="small">${x.hasActuals ? varHTML(x.costVariance, true, true) : '<span class="faint">no actuals</span>'}</div>`; }, val: j => Calc.job(j).plannedCost },
+    ] : []),
+    ...(f && F('margin') ? [
       { k: 'gp', label: 'GP % plan → actual', r: 1, fmt: j => { const x = Calc.job(j); return `${pct(x.plannedGPPct)} → ${x.hasActuals ? `<b>${pct(x.actualGPPct)}</b>` : '<span class="faint">—</span>'}`; }, val: j => Calc.job(j).hasActuals ? Calc.job(j).actualGPPct : Calc.job(j).plannedGPPct },
     ] : []),
-    { k: 'inv', label: 'Invoice', fmt: j => { const x = Calc.job(j); const ub = r2(x.actualPO - x.invoiced); return invBadge(x.invoiceStatus) + (can('viewFinancials') && ub > 0.005 && j.status !== 'Cancelled' && x.invoiced > 0 ? `<div class="small faint">${compact(ub)} unbilled</div>` : ''); }, val: j => INVOICE_STATUSES.indexOf(Calc.jobInvoiceStatus(j)) },
-    { k: 'pe', label: 'Project eng.', fmt: j => esc(nameOf('employees', j.projectEngineerId) || '—'), val: j => nameOf('employees', j.projectEngineerId) },
+    { k: 'inv', label: 'Invoice', fmt: j => { const x = Calc.job(j); const ub = r2(x.actualPO - x.invoiced); return invBadge(x.invoiceStatus) + (can('viewFinancials') && F('invoicing') && ub > 0.005 && j.status !== 'Cancelled' && x.invoiced > 0 ? `<div class="small faint">${compact(ub)} unbilled</div>` : ''); }, val: j => INVOICE_STATUSES.indexOf(Calc.jobInvoiceStatus(j)) },
+    ...(F('engineers') ? [{ k: 'pe', label: 'Project eng.', fmt: j => esc(nameOf('employees', j.projectEngineerId) || '—'), val: j => nameOf('employees', j.projectEngineerId) }] : []),
   ];
 };
 
@@ -2452,9 +2504,9 @@ ACT.exportJobs = el => {
 
 /* ---------------- create / edit form ---------------- */
 function jobFields(job, type, isNew) {
-  const S = APP.db.settings; const fin = can('viewFinancials'), efin = can('editFinancials');
+  const S = APP.db.settings; const fin = can('viewFinancials'), efin = can('editFinancials'); const F = k => can('fld_' + k);
   const statuses = S.jobStatuses.filter(s => s !== 'Closed' || job?.status === 'Closed');
-  return {
+  const G = {
     basic: [
       { k: 'jobNo', label: 'Job number', readonly: isNew || !isSuperAdmin(), span: 3, hint: isNew ? 'Generated on save' : isSuperAdmin() ? 'Super Admin may change it (must be unique; reason required)' : 'Permanent identifier' },
       { k: 'type', label: 'Job type', type: 'select', options: isNew ? JOB_TYPES.filter(canType) : JOB_TYPES, req: true, span: 3, readonly: !isNew && !isSuperAdmin(), hint: isNew ? '' : isSuperAdmin() ? 'Super Admin may change it (reason required; job number is kept)' : 'Fixed after creation — ask a Super Admin' },
@@ -2483,6 +2535,10 @@ function jobFields(job, type, isNew) {
     notes: [{ k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 3 }],
     control: isNew ? [] : [{ k: 'reason', label: 'Reason for change', type: 'textarea', rows: 2, span: 12, hint: job.locked ? 'Required — this job is closed and locked.' : 'Required when revising PO values; recorded in the audit trail.' }],
   };
+  /* field-level visibility (Settings → Roles → Fields) */
+  const FIELD_PERM = { zohoSo: 'zohoSo', customerOrderNo: 'customerOrderNo', lpoDate: 'customerOrderNo', endClientId: 'endClient', completionPct: 'completion', poValue: 'poValue', actualPoValue: 'poValue', invoiceNo: 'invoicing', invoiceDate: 'invoicing', psDate: 'dates', pfDate: 'dates', actualStart: 'dates', actualFinish: 'dates', projectEngineerId: 'engineers', serviceEngineerId: 'engineers' };
+  for (const g of Object.keys(G)) G[g] = G[g].filter(f => !FIELD_PERM[f.k] || F(FIELD_PERM[f.k]));
+  return G;
 }
 function jobForm(root, job, type, embedded) {
   const isNew = !job; const S = APP.db.settings;
@@ -2536,9 +2592,10 @@ VIEWS.job = (root, r) => {
   const job = get('jobs', r.parts[1]);
   if (!job) { setCrumbs([['Jobs', '#/jobs/all'], ['Not found', '#']]); root.innerHTML = `<div class="card empty">${ic('search')}<b>Job not found</b><a href="#/jobs/all">Back to jobs</a></div>`; return; }
   if (!canType(job.type)) { setCrumbs([['Jobs', '#/jobs/all'], [job.jobNo, '#']]); root.innerHTML = `<div class="card empty">${ic('lock')}<b>No access to ${esc(job.type)} jobs</b></div>`; return; }
-  const tab = JOB_TABS.find(t => t[0] === r.parts[2]) ? r.parts[2] : 'details';
+  const tabs = JOB_TABS.filter(([k]) => k === 'details' || can('jobTab_' + k));
+  const tab = tabs.find(t => t[0] === r.parts[2]) ? r.parts[2] : 'details';
   setCrumbs([['Jobs', '#/jobs/all'], [job.type, '#/jobs/' + TYPE_SLUG[job.type]], [job.jobNo, `#/job/${job.id}`], [JOB_TABS.find(t => t[0] === tab)[1], '#']]);
-  const x = Calc.job(job); const fin = can('viewFinancials');
+  const x = Calc.job(job); const fin = can('viewFinancials'); const F = k => can('fld_' + k);
   const counts = { manpower: L(job.id, 'plannedManpower').length + L(job.id, 'actualManpower').length, materials: L(job.id, 'plannedMaterials').length + L(job.id, 'actualMaterials').length + L(job.id, 'inventoryTransfers').length, misc: L(job.id, 'plannedMisc').length + L(job.id, 'actualMisc').length, invoices: L(job.id, 'invoices').length, notes: L(job.id, 'jobComments').length + L(job.id, 'jobAttachments').length };
   root.innerHTML = `
   <section class="job-head">
@@ -2550,18 +2607,18 @@ VIEWS.job = (root, r) => {
         ${can('jobDelete') ? (job.archived ? `<button class="btn" data-act="restoreJob" data-id="${job.id}">Restore</button>` : `<button class="btn danger" data-act="archiveJob" data-id="${job.id}">${ic('trash', 'sm')}Archive</button>`) : ''}
       </div></div>
     <div style="margin-top:6px;font-weight:600">${esc(job.description)}</div>
-    <div class="meta"><span>Company <b>${esc(nameOf('customers', job.customerId) || '—')}</b></span><span>End-client <b>${esc(nameOf('endClients', job.endClientId) || '—')}</b></span><span>Opened <b>${fmtDate(job.openingDate)}</b></span><span>Plan <b>${fmtDate(job.psDate)} → ${fmtDate(job.pfDate)}</b></span><span>Completion <b>${num(job.completionPct)}%</b></span>${job.locked ? `<span>Closed <b>${fmtDate(job.closureDate)}</b> by <b>${esc(nameOf('users', job.closedBy))}</b></span>` : ''}</div>
+    <div class="meta"><span>Company <b>${esc(nameOf('customers', job.customerId) || '—')}</b></span>${F('endClient') ? `<span>End-client <b>${esc(nameOf('endClients', job.endClientId) || '—')}</b></span>` : ''}<span>Opened <b>${fmtDate(job.openingDate)}</b></span>${F('dates') ? `<span>Plan <b>${fmtDate(job.psDate)} → ${fmtDate(job.pfDate)}</b></span>` : ''}${F('completion') ? `<span>Completion <b>${num(job.completionPct)}%</b></span>` : ''}${job.locked ? `<span>Closed <b>${fmtDate(job.closureDate)}</b> by <b>${esc(nameOf('users', job.closedBy))}</b></span>` : ''}</div>
     ${fin ? `<div class="fin-strip">
-      <div><div class="fl">PO value</div><div class="fv">${compact(x.actualPO)}</div><div class="fs">${x.actualPO !== x.plannedPO ? 'orig. ' + compact(x.plannedPO) : esc(APP.db.settings.currency)}</div></div>
-      <div><div class="fl">Planned cost</div><div class="fv">${compact(x.plannedCost)}</div><div class="fs">${pct(x.plannedGPPct)} planned GP</div></div>
-      <div><div class="fl">Actual cost</div><div class="fv">${compact(x.actualCost)}</div><div class="fs">${x.hasActuals ? varHTML(x.costVariance) : 'no actuals yet'}</div></div>
-      <div><div class="fl">Actual GP</div><div class="fv" style="color:${x.actualGP < 0 ? 'var(--danger)' : 'inherit'}">${x.hasActuals ? compact(x.actualGP) : '—'}</div><div class="fs">${x.hasActuals ? pct(x.actualGPPct) : 'pending costs'}</div></div>
-      <div><div class="fl">Invoiced</div><div class="fv">${compact(x.invoiced)}</div><div class="fs">${compact(x.paid)} paid</div></div>
-      <div><div class="fl">Outstanding</div><div class="fv">${compact(x.outstanding)}</div><div class="fs">${x.invoiceStatus}</div></div>
+      ${F('poValue') ? `<div><div class="fl">PO value</div><div class="fv">${compact(x.actualPO)}</div><div class="fs">${x.actualPO !== x.plannedPO ? 'orig. ' + compact(x.plannedPO) : esc(APP.db.settings.currency)}</div></div>` : ''}
+      ${F('costs') ? `<div><div class="fl">Planned cost</div><div class="fv">${compact(x.plannedCost)}</div><div class="fs">${F('margin') ? pct(x.plannedGPPct) + ' planned GP' : ''}</div></div>
+      <div><div class="fl">Actual cost</div><div class="fv">${compact(x.actualCost)}</div><div class="fs">${x.hasActuals ? varHTML(x.costVariance) : 'no actuals yet'}</div></div>` : ''}
+      ${F('margin') ? `<div><div class="fl">Actual GP</div><div class="fv" style="color:${x.actualGP < 0 ? 'var(--danger)' : 'inherit'}">${x.hasActuals ? compact(x.actualGP) : '—'}</div><div class="fs">${x.hasActuals ? pct(x.actualGPPct) : 'pending costs'}</div></div>` : ''}
+      ${F('invoicing') ? `<div><div class="fl">Invoiced</div><div class="fv">${compact(x.invoiced)}</div><div class="fs">${compact(x.paid)} paid</div></div>
+      <div><div class="fl">Outstanding</div><div class="fv">${compact(x.outstanding)}</div><div class="fs">${x.invoiceStatus}</div></div>` : ''}
     </div>` : ''}
   </section>
   ${job.locked ? `<div class="lockbar">${ic('lock')}<div><b>Closed and locked.</b> Operational and financial fields are read-only${can('editClosedJobs') ? ' — you can edit with a recorded reason (admin).' : '.'}${can('changeInvoiceStatus') || can('recordPayments') ? ' Invoice status and payments can still be updated.' : ''}</div></div>` : ''}
-  <nav class="tabs" role="tablist" aria-label="Job sections">${JOB_TABS.map(([k, l]) => `<a role="tab" href="#/job/${job.id}/${k}" aria-selected="${k === tab}">${l}${counts[k] ? ` <span class="cnt">${counts[k]}</span>` : ''}</a>`).join('')}</nav>
+  <nav class="tabs" role="tablist" aria-label="Job sections">${tabs.map(([k, l]) => `<a role="tab" href="#/job/${job.id}/${k}" aria-selected="${k === tab}">${l}${counts[k] ? ` <span class="cnt">${counts[k]}</span>` : ''}</a>`).join('')}</nav>
   <div id="tabBody"></div>`;
   const body = $('#tabBody', root);
   ({ details: () => jobForm(body, job), manpower: () => tabManpower(body, job, x), materials: () => tabMaterials(body, job, x), misc: () => tabMisc(body, job, x), financials: () => tabFinancials(body, job, x), invoices: () => tabInvoices(body, job, x), notes: () => tabNotes(body, job), history: () => tabHistory(body, job) })[tab]();
@@ -2748,14 +2805,19 @@ function lineFields(t, job, rec) {
   }
   if (t === 'plannedMaterials' || t === 'actualMaterials') {
     const pl = t === 'plannedMaterials';
-    return [
+    const item = [
       { k: 'description', label: 'Material description', req: true, span: 8 }, { k: 'category', label: 'Material category', type: 'select', options: S.materialCategories, span: 4 },
-      { k: 'supplierId', label: 'Vendor / supplier', type: 'select', options: supOpts(rec?.supplierId), span: 6 },
-      { k: pl ? 'expectedDate' : 'purchaseDate', label: pl ? 'Expected purchase date' : 'Purchase date', type: 'date', req: !pl, span: 6 },
       { k: 'qty', label: pl ? 'Planned quantity' : 'Actual quantity', type: 'number', min: 0, req: true, span: 4 }, { k: 'uom', label: 'Unit of measure', type: 'select', options: S.uoms, span: 4 },
       { k: 'unitPrice', label: `${pl ? 'Planned' : 'Actual'} unit price (${S.currency})`, type: 'number', min: 0, req: true, span: 4 },
+    ];
+    const head = [
+      { k: 'supplierId', label: 'Vendor / supplier', type: 'select', options: supOpts(rec?.supplierId), span: 6 },
+      { k: pl ? 'expectedDate' : 'purchaseDate', label: pl ? 'Expected purchase date' : 'Purchase date', type: 'date', req: !pl, span: 6 },
       ...(pl ? [] : [{ k: 'poNo', label: 'Purchase order (PO) #', span: 6, hint: 'Your PO number to the vendor' }, { k: 'supplierRef', label: 'Supplier invoice / reference no.', span: 6 }]),
       { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 },
+    ];
+    return [
+      ...(pl ? [...item, ...head] : [...head, { k: '_s', type: 'section', label: 'Material item' }, ...item]),
       { k: '_prev', type: 'html', span: 12, html: '<div class="alert info" id="linePrev" style="margin:0"></div>' }, ...reasonField(job),
     ];
   }
@@ -2814,7 +2876,71 @@ function openLineForm(t, job, rec) {
   });
 }
 const readFormSafe = (el, fields) => readForm($('form', el), fields);
-ACT.addLine = el => openLineForm(el.dataset.t, get('jobs', el.dataset.job));
+ACT.addLine = el => el.dataset.t === 'actualMaterials' ? openPurchaseForm(get('jobs', el.dataset.job)) : openLineForm(el.dataset.t, get('jobs', el.dataset.job));
+/* Add purchase: one vendor / date / PO / invoice ref, many material items — saved as one line per item */
+function openPurchaseForm(job) {
+  const S = APP.db.settings; const token = uid('tok');
+  const head = [
+    { k: 'supplierId', label: 'Vendor / supplier', type: 'select', options: supOpts(), span: 6, placeholder: '— Select vendor —' },
+    { k: 'purchaseDate', label: 'Purchase date', type: 'date', req: true, span: 6 },
+    { k: 'poNo', label: 'Purchase order (PO) #', span: 6, hint: 'Your PO number to the vendor' }, { k: 'supplierRef', label: 'Supplier invoice / reference no.', span: 6 },
+    { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 }, ...reasonField(job),
+  ];
+  const selOpts = (list, v) => list.map(o => `<option value="${esc(o)}" ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('');
+  const rowHTML = (it = {}) => `<tr class="pi-row">
+    <td><input type="text" name="description" value="${esc(it.description || '')}" placeholder="Material description" required></td>
+    <td><select name="category">${selOpts(S.materialCategories, it.category || S.materialCategories[0])}</select></td>
+    <td><input name="qty" type="number" step="any" min="0" inputmode="decimal" value="${esc(it.qty ?? '')}" placeholder="0"></td>
+    <td><select name="uom">${selOpts(S.uoms, it.uom || 'EA')}</select></td>
+    <td><input name="unitPrice" type="number" step="any" min="0" inputmode="decimal" value="${esc(it.unitPrice ?? '')}" placeholder="0.00"></td>
+    <td class="r pi-total mono">0.00</td>
+    <td class="row-actions"><button type="button" class="icon-btn danger" data-pi="del" aria-label="Remove item">${ic('trash', 'sm')}</button></td></tr>`;
+  const body = `<form novalidate>${formGrid(head, { purchaseDate: todayISO() })}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)"><h3 style="margin:0 0 8px">Material items <span class="small muted" style="font-weight:400">· all items on this PO</span></h3>
+    <div class="tbl-wrap" style="max-height:none"><table class="dt pi-table"><thead><tr><th style="width:34%">Material</th><th>Material category</th><th style="width:11%">Actual quantity</th><th style="width:10%">Unit of measure</th><th style="width:13%">Actual unit price (${esc(S.currency)})</th><th class="r" style="width:12%">Total</th><th></th></tr></thead>
+    <tbody id="piRows">${rowHTML()}${rowHTML()}${rowHTML()}</tbody>
+    <tfoot><tr><td colspan="5"><button type="button" class="btn sm" data-pi="add">${ic('plus', 'sm')}Add item</button> <span class="small muted" id="piCount"></span></td><td class="r"><b id="piGrand" class="mono">0.00</b></td><td></td></tr></tfoot></table></div>
+    <div class="alert info" id="piPrev" style="margin:10px 0 0"></div></div></form>`;
+  modal({
+    title: `Add purchase · ${esc(job.jobNo)}`, size: 'wide', body,
+    foot: `<button class="btn" data-close type="button">Cancel</button><button class="btn primary" data-submit type="button">Save purchase</button>`,
+    onOpen(el, close) {
+      const form = $('form', el); const rowsEl = $('#piRows', el);
+      const items = () => $$('tr.pi-row', rowsEl).map(tr => ({ tr, description: tr.querySelector('[name=description]').value, category: tr.querySelector('[name=category]').value, qty: tr.querySelector('[name=qty]').value, uom: tr.querySelector('[name=uom]').value, unitPrice: tr.querySelector('[name=unitPrice]').value }));
+      const recalc = () => {
+        let g = 0, n = 0;
+        items().forEach(it => { const t = r2(num(it.qty) * num(it.unitPrice)); it.tr.querySelector('.pi-total').textContent = fmtN(t); if ((it.description || '').trim() || isNum(it.qty) || isNum(it.unitPrice)) { n++; g = r2(g + t); } });
+        $('#piGrand', el).textContent = fmtN(g); $('#piCount', el).textContent = n ? `${n} item${n === 1 ? '' : 's'}` : '';
+        $('#piPrev', el).innerHTML = `${ic('info', 'sm')} ${n || 'No'} item${n === 1 ? '' : 's'} · total purchase cost <b>${moneyTxt(g)}</b> — added to actual material cost of ${esc(job.jobNo)}.`;
+      };
+      form.addEventListener('input', recalc); form.addEventListener('change', recalc); recalc();
+      el.addEventListener('click', e => {
+        const b = e.target.closest('[data-pi]'); if (!b) return;
+        if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('input').focus(); }
+        if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else b.closest('tr').querySelectorAll('input').forEach(i => i.value = ''); }
+        recalc();
+      });
+      const doSubmit = () => {
+        const btn = $('[data-submit]', el); if (btn.disabled) return; btn.disabled = true;
+        try {
+          $$('tr.pi-row .invalid', rowsEl).forEach(x => x.classList.remove('invalid'));
+          const h = readForm(form, head); const reason = h.reason; delete h.reason;
+          const list = items().map(({ tr, ...it }) => it);
+          try { const recs = API.addPurchase(job.id, h, list, reason, token); toast(`Purchase saved · ${recs.length} item${recs.length === 1 ? '' : 's'}`); close(true); rerender(); }
+          catch (err) { // highlight item cells from field keys i_<k>_<row>
+            if (err instanceof AppError && err.fields) {
+              const trs = $$('tr.pi-row', rowsEl); const LBL = { description: 'Material', qty: 'Quantity', unitPrice: 'Unit price' }; const fl = {};
+              for (const [k, m] of Object.entries(err.fields)) { const mm = k.match(/^i_(\w+)_(\d+)$/); if (mm) { trs[+mm[2]]?.querySelector(`[name=${mm[1]}]`)?.classList.add('invalid'); fl[`Item ${+mm[2] + 1} · ${LBL[mm[1]] || mm[1]}`] = m; } else fl[k === 'items' ? 'Material items' : k] = m; }
+              err.fields = fl;
+            }
+            throw err;
+          }
+        } catch (err) { showErr(err, el); } finally { $('[data-submit]', el).disabled = false; }
+      };
+      $('[data-submit]', el).onclick = doSubmit; form.addEventListener('submit', e => { e.preventDefault(); doSubmit(); });
+    },
+  });
+}
 ACT.editLine = el => { const rec = get(el.dataset.t, el.dataset.id); openLineForm(el.dataset.t, get('jobs', rec.jobId), rec); };
 ACT.delLine = async el => {
   const t = el.dataset.t, rec = get(t, el.dataset.id), job = get('jobs', rec.jobId);
@@ -3078,21 +3204,21 @@ ACT.delLeave = async el => { const c = await confirmBox({ title: 'Remove leave?'
 /* =====================================================================
    Master data — customers, end-clients, suppliers, employees, store items
    ===================================================================== */
-const contactOK = () => can('manageMaster') || can('manageUsers') || can('rosterAssign');
+const contactOK = () => can('fld_empContact'); const partyOK = () => can('fld_partyContact'); const termsOK = () => can('fld_creditTerms');
 const MASTER = {
   customers: {
     label: 'Companies / Customers', one: 'customer', icon: 'building', table: 'customers',
-    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'Company name', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.address || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')} ${esc(r.phone || '')}</div>` }, { k: 'paymentTerms', label: 'Terms' }, { k: 'creditLimit', label: 'Credit limit', r: 1, fmt: r => r.creditLimit ? money(r.creditLimit, { cur: false }) : '—' }, { k: 'jobs', label: 'Jobs', r: 1, val: r => APP.db.jobs.filter(j => j.customerId === r.id && !j.archived).length, fmt: r => APP.db.jobs.filter(j => j.customerId === r.id && !j.archived).length }],
+    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'Company name', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.address || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => partyOK() ? `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')} ${esc(r.phone || '')}</div>` : '<span class="faint">restricted</span>' }, { k: 'paymentTerms', label: 'Terms', fmt: r => termsOK() ? esc(r.paymentTerms || '—') : '<span class="faint">•••</span>' }, { k: 'creditLimit', label: 'Credit limit', r: 1, fmt: r => termsOK() ? (r.creditLimit ? money(r.creditLimit, { cur: false }) : '—') : '<span class="faint">•••</span>', val: r => termsOK() ? r.creditLimit : 0 }, { k: 'jobs', label: 'Jobs', r: 1, val: r => APP.db.jobs.filter(j => j.customerId === r.id && !j.archived).length, fmt: r => APP.db.jobs.filter(j => j.customerId === r.id && !j.archived).length }],
     fields: () => [{ k: 'name', label: 'Company name', req: true, span: 8 }, { k: 'code', label: 'Customer code', req: true, span: 4 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'trn', label: 'TRN / VAT number', span: 6 }, { k: 'address', label: 'Address', type: 'textarea', rows: 2, span: 12 }, { k: 'paymentTerms', label: 'Payment terms', span: 4 }, { k: 'creditLimit', label: 'Credit limit', type: 'number', min: 0, span: 4, hidden: !can('viewFinancials') }, { k: 'zohoCustomerId', label: 'Zoho Books customer ID', span: 4, hint: 'For future sync' }, { k: 'notes', label: 'Notes', type: 'textarea', rows: 2, span: 12 }],
   },
   endClients: {
     label: 'End-Clients', one: 'end-client', icon: 'map-pin', table: 'endClients',
-    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'End-client', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.address || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')}</div>` }, { k: 'customerIds', label: 'Related customers', fmt: r => (r.customerIds || []).map(id => esc(nameOf('customers', id))).join(', ') || '—', nosort: 1 }, { k: 'jobs', label: 'Jobs', r: 1, val: r => APP.db.jobs.filter(j => j.endClientId === r.id && !j.archived).length, fmt: r => APP.db.jobs.filter(j => j.endClientId === r.id && !j.archived).length }],
+    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'End-client', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.address || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => partyOK() ? `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')}</div>` : '<span class="faint">restricted</span>' }, { k: 'customerIds', label: 'Related customers', fmt: r => (r.customerIds || []).map(id => esc(nameOf('customers', id))).join(', ') || '—', nosort: 1 }, { k: 'jobs', label: 'Jobs', r: 1, val: r => APP.db.jobs.filter(j => j.endClientId === r.id && !j.archived).length, fmt: r => APP.db.jobs.filter(j => j.endClientId === r.id && !j.archived).length }],
     fields: () => [{ k: 'name', label: 'End-client name', req: true, span: 8 }, { k: 'code', label: 'Client code', req: true, span: 4 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'address', label: 'Address / site', span: 6 }, { k: 'customerIds', label: 'Related customers / companies', type: 'multi', options: live('customers').map(c => [c.id, c.name]), span: 12, hint: 'One end-client can serve several customers — no duplicates needed' }, { k: 'notes', label: 'Notes', type: 'textarea', rows: 2, span: 12 }],
   },
   suppliers: {
     label: 'Suppliers', one: 'supplier', icon: 'truck', table: 'suppliers',
-    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'Supplier', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.category || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')} ${esc(r.phone || '')}</div>` }, { k: 'paymentTerms', label: 'Terms' }, { k: 'trn', label: 'TRN' }],
+    cols: [{ k: 'code', label: 'Code', fmt: r => `<span class="mono">${esc(r.code)}</span>` }, { k: 'name', label: 'Supplier', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.category || '')}</div>` }, { k: 'contactPerson', label: 'Contact', fmt: r => partyOK() ? `${esc(r.contactPerson || '—')}<div class="small faint">${esc(r.email || '')} ${esc(r.phone || '')}</div>` : '<span class="faint">restricted</span>' }, { k: 'paymentTerms', label: 'Terms', fmt: r => termsOK() ? esc(r.paymentTerms || '—') : '<span class="faint">•••</span>' }, { k: 'trn', label: 'TRN' }],
     fields: () => [{ k: 'name', label: 'Supplier name', req: true, span: 8 }, { k: 'code', label: 'Supplier code', req: true, span: 4 }, { k: 'category', label: 'Supplier category', type: 'select', options: ['Materials', 'Manpower', 'Equipment', 'Logistics', 'Accommodation', 'Services', 'Other'], span: 6 }, { k: 'paymentTerms', label: 'Payment terms', span: 6 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'trn', label: 'TRN / VAT number', span: 6 }, { k: 'address', label: 'Address', type: 'textarea', rows: 2, span: 12 }, { k: 'notes', label: 'Notes', type: 'textarea', rows: 2, span: 12 }],
   },
   inhouse: {
@@ -3113,7 +3239,9 @@ const MASTER = {
   },
 };
 VIEWS.master = (root, r) => {
-  const sec = MASTER[r.parts[1]] ? r.parts[1] : 'customers'; const M = MASTER[sec];
+  const allowed = Object.keys(MASTER).filter(k => can('master_' + k));
+  if (!allowed.length) { setCrumbs([['Master Data', '#/master']]); root.innerHTML = `<div class="card empty">${ic('lock')}<b>No master data sections are enabled for your role</b></div>`; return; }
+  const sec = MASTER[r.parts[1]] && allowed.includes(r.parts[1]) ? r.parts[1] : allowed[0]; const M = MASTER[sec];
   setCrumbs([['Master Data', '#/master'], [M.label, '#/master/' + sec]]);
   const s = vs('m_' + sec, { q: '', status: 'Active', sort: 'name', dir: 'asc', page: 1, size: 25 });
   const q = s.q.toLowerCase();
@@ -3125,7 +3253,7 @@ VIEWS.master = (root, r) => {
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>Master data</h1><p>Shared reference records used by jobs, costing and the roster. Inactive records stay linked to history but can't be chosen for new work.</p></div>
     <div class="actions">${can('exportReports') ? `<button class="btn" data-act="mExport" data-sec="${sec}">${ic('download', 'sm')}Export CSV</button>` : ''}${mm ? `<button class="btn primary" data-act="mEdit" data-sec="${sec}">${ic('plus', 'sm')}New ${esc(M.one)}</button>` : ''}</div></div>
-  <nav class="tabs" role="tablist">${Object.entries(MASTER).map(([k, m]) => `<a role="tab" href="#/master/${k}" aria-selected="${k === sec}">${ic(m.icon, 'sm')}${esc(m.label)} <span class="cnt">${APP.db[m.table].filter(x => !x.archived && (!m.filter || m.filter(x)) && (x.status || 'Active') === 'Active').length}</span></a>`).join('')}</nav>
+  <nav class="tabs" role="tablist">${Object.entries(MASTER).filter(([k]) => allowed.includes(k)).map(([k, m]) => `<a role="tab" href="#/master/${k}" aria-selected="${k === sec}">${ic(m.icon, 'sm')}${esc(m.label)} <span class="cnt">${APP.db[m.table].filter(x => !x.archived && (!m.filter || m.filter(x)) && (x.status || 'Active') === 'Active').length}</span></a>`).join('')}</nav>
   <div class="filters"><label class="search"><span class="sr">Search</span>${ic('search', 'sm')}<input type="search" placeholder="Search ${esc(M.label.toLowerCase())}" value="${esc(s.q)}" data-chg="mf" data-k="q" data-sec="${sec}" data-focus-key="msearch"></label>
     <select aria-label="Status" data-chg="mf" data-k="status" data-sec="${sec}">${opt([['Active', 'Active'], ['Inactive', 'Inactive']], s.status, 'All statuses')}</select></div>
   <section class="card">${tableHTML({ caption: M.label, view: 'm_' + sec, sort: s.sort, dir: s.dir, cols, rows: rows.slice((s.page - 1) * s.size, s.page * s.size), empty: `No ${M.label.toLowerCase()} found` })}${rows.length ? pagerHTML('m_' + sec, rows.length, s.page, s.size) : ''}</section>`;
@@ -3148,13 +3276,31 @@ ACT.mView = el => {
   const M = MASTER[el.dataset.sec]; const rec = get(M.table, el.dataset.id); const fields = M.fields(rec).filter(f => !f.hidden);
   const link = { customers: 'customerId', endClients: 'endClientId' }[M.table];
   const jobs = link ? APP.db.jobs.filter(j => j[link] === rec.id && !j.archived && canType(j.type)) : M.table === 'employees' ? APP.db.jobs.filter(j => !j.archived && canType(j.type) && (j.projectEngineerId === rec.id || j.serviceEngineerId === rec.id || L(j.id, 'plannedManpower').some(l => l.employeeId === rec.id) || L(j.id, 'actualManpower').some(l => l.employeeId === rec.id))) : M.table === 'suppliers' ? APP.db.jobs.filter(j => !j.archived && canType(j.type) && ['plannedMaterials', 'actualMaterials', 'actualMisc', 'actualManpower'].some(t => L(j.id, t).some(l => l.supplierId === rec.id))) : [];
-  const show = (f) => { let v = rec[f.k]; if (f.type === 'select') v = (f.options.find(o => (Array.isArray(o) ? o[0] : o) === v) || [v, v]); if (Array.isArray(v)) v = v[1]; if (f.type === 'multi') v = (rec[f.k] || []).map(id => nameOf('customers', id)).join(', '); if (f.type === 'date') v = fmtDate(v); if (['phone', 'email'].includes(f.k) && M.table === 'employees' && !contactOK()) v = 'restricted'; return v == null || v === '' ? '—' : esc(v); };
+  const show = (f) => { let v = rec[f.k]; if (f.type === 'select') v = (f.options.find(o => (Array.isArray(o) ? o[0] : o) === v) || [v, v]); if (Array.isArray(v)) v = v[1]; if (f.type === 'multi') v = (rec[f.k] || []).map(id => nameOf('customers', id)).join(', '); if (f.type === 'date') v = fmtDate(v); if (['phone', 'email'].includes(f.k) && M.table === 'employees' && !contactOK()) v = 'restricted'; if (['contactPerson', 'phone', 'email'].includes(f.k) && ['customers', 'endClients', 'suppliers'].includes(M.table) && !partyOK()) v = 'restricted'; if (['paymentTerms', 'creditLimit'].includes(f.k) && !termsOK()) v = '•••'; return v == null || v === '' ? '—' : esc(v); };
   modal({ title: esc(rec.name), size: 'wide', body: `<div class="form-grid">${fields.filter(f => !['html', 'section'].includes(f.type)).map(f => `<div class="field s${f.span || 6}"><span>${esc(f.label)}</span><div>${show(f)}</div></div>`).join('')}</div>
     <h3 style="margin:18px 0 8px">Linked jobs (${jobs.length})</h3>${jobs.length ? `<div>${jobs.slice(0, 40).map(j => `<a class="jobno" style="margin-right:10px" href="#/job/${j.id}" data-close>${esc(j.jobNo)}</a>`).join('')}</div>` : '<p class="muted small">None</p>'}
     <p class="small faint" style="margin-top:14px">Created ${fmtDT(rec.createdAt)} · updated ${fmtDT(rec.updatedAt)} by ${esc(nameOf('users', rec.updatedBy) || nameOf('users', rec.createdBy) || '—')}</p>` });
 };
-ACT.mExport = el => { const M = MASTER[el.dataset.sec]; const fields = M.fields().filter(f => !f.hidden && !['html', 'section'].includes(f.type)); const rows = APP.db[M.table].filter(x => !x.archived && (!M.filter || M.filter(x))); exportCSV(el.dataset.sec, [...fields.map(f => f.label), 'Status'], rows.map(r => [...fields.map(f => f.type === 'multi' ? (r[f.k] || []).map(id => nameOf('customers', id)).join('; ') : (['phone', 'email'].includes(f.k) && M.table === 'employees' && !contactOK()) ? '' : f.k === 'supplierId' ? nameOf('suppliers', r[f.k]) : r[f.k]), r.status || 'Active'])); };
-ACT.rcv = el => { const it = get('inventoryItems', el.dataset.id); modalForm({ title: `Receive stock · ${esc(it.sku)}`, size: 'narrow', intro: `<p class="small muted">On hand ${fmtN(it.qtyOnHand, 2)} ${esc(it.uom)} at ${can('viewFinancials') ? fmtN(it.avgCost, 4) : '•••'} average. The weighted-average cost is recalculated; past transfers keep their cost.</p>`, fields: [{ k: 'qty', label: 'Quantity received', type: 'number', min: 0, req: true, span: 6 }, { k: 'unitCost', label: 'Unit cost', type: 'number', min: 0, req: true, span: 6 }, { k: 'ref', label: 'GRN / supplier invoice ref.', span: 12 }], onSubmit(v) { API.receiveStock(it.id, v.qty, v.unitCost, v.ref); toast('Stock received'); rerender(); } }); };
+ACT.mExport = el => { const M = MASTER[el.dataset.sec]; const fields = M.fields().filter(f => !f.hidden && !['html', 'section'].includes(f.type)); const rows = APP.db[M.table].filter(x => !x.archived && (!M.filter || M.filter(x))); exportCSV(el.dataset.sec, [...fields.map(f => f.label), 'Status'], rows.map(r => [...fields.map(f => f.type === 'multi' ? (r[f.k] || []).map(id => nameOf('customers', id)).join('; ') : (['phone', 'email'].includes(f.k) && M.table === 'employees' && !contactOK()) ? '' : (['contactPerson', 'phone', 'email'].includes(f.k) && M.table !== 'employees' && !partyOK()) ? '' : (['paymentTerms', 'creditLimit'].includes(f.k) && !termsOK()) ? '' : f.k === 'supplierId' ? nameOf('suppliers', r[f.k]) : r[f.k]), r.status || 'Active'])); };
+ACT.rcv = el => {
+  const it = get('inventoryItems', el.dataset.id); const sups = live('suppliers').filter(x => x.status !== 'Inactive').sort(by('name', 1));
+  const last = APP.db.stockReceipts.filter(r => r.itemId === it.id && !r.archived).sort(by('receiptDate', -1)).slice(0, 5);
+  modalForm({
+    title: `Receive stock · ${esc(it.sku)}`, size: 'wide',
+    intro: `<p class="small muted">On hand ${fmtN(it.qtyOnHand, 2)} ${esc(it.uom)} at ${can('viewFinancials') ? fmtN(it.avgCost, 4) : '•••'} average. The weighted-average cost is recalculated; past transfers keep their cost.</p>`,
+    fields: [
+      { k: 'receiptDate', label: 'Date received', type: 'date', req: true, span: 4 },
+      { k: 'supplierId', label: 'Supplier', type: 'select', options: sups.map(x => [x.id, x.name]), span: 8, placeholder: '— Select supplier —' },
+      { k: 'grnNo', label: 'GRN #', span: 4, hint: 'Goods receipt note number' }, { k: 'lpoNo', label: 'LPO #', span: 4, hint: 'Your purchase order to the supplier' }, { k: 'ref', label: 'Supplier invoice / delivery note', span: 4 },
+      { k: 'qty', label: `Quantity received (${esc(it.uom)})`, type: 'number', min: 0, req: true, span: 4 }, { k: 'unitCost', label: `Unit cost (${esc(APP.db.settings.currency)})`, type: 'number', min: 0, req: true, span: 4 },
+      { k: '_prev', type: 'html', span: 4, html: '<div class="alert info" id="rcvPrev" style="margin:0;height:100%"></div>' },
+      ...(last.length ? [{ k: '_hist', type: 'html', span: 12, html: `<div class="small muted" style="margin-top:4px"><b>Recent receipts</b><table class="dt" style="margin-top:6px"><thead><tr><th>Date</th><th>Supplier</th><th>GRN #</th><th>LPO #</th><th class="r">Qty</th><th class="r">Unit cost</th></tr></thead><tbody>${last.map(r => `<tr><td>${fmtDate(r.receiptDate)}</td><td>${esc(nameOf('suppliers', r.supplierId) || '—')}</td><td class="mono">${esc(r.grnNo || r.ref || '—')}</td><td class="mono">${esc(r.lpoNo || '—')}</td><td class="r">${fmtN(r.qty, 2)}</td><td class="r">${can('viewFinancials') ? fmtN(r.unitCost, 4) : '•••'}</td></tr>`).join('')}</tbody></table></div>` }] : []),
+    ],
+    values: { receiptDate: todayISO() },
+    onChange(v, el) { const p = $('#rcvPrev', el); if (!p) return; const q0 = num(it.qtyOnHand), c0 = num(it.avgCost), q = num(v.qty), c = num(v.unitCost); const avg = q0 + q > 0 ? (q0 * c0 + q * c) / (q0 + q) : c0; p.innerHTML = `${ic('info', 'sm')} Value <b>${moneyTxt(r2(q * c))}</b><div class="small">New on hand ${fmtN(q0 + q, 2)} ${esc(it.uom)}${can('viewFinancials') ? ` · new avg. ${fmtN(avg, 4)}` : ''}</div>`; },
+    onSubmit(v) { delete v._prev; delete v._hist; API.receiveStock(it.id, v); toast('Stock received'); rerender(); },
+  });
+};
 
 /* =====================================================================
    Reports — a registry; add a report by adding one entry to REPORTS
@@ -3260,7 +3406,12 @@ const REPORTS = [
     rows: f => { const J = repJobs({ type: f.type, cust: f.cust }, j => j.status !== 'Cancelled'); const inv = J.flatMap(j => L(j.id, 'invoices')); const pays = inv.flatMap(i => idx().payByInv[i.id] || []); return monthsRange(f.from, f.to).map(m => { const jm = J.filter(j => monthKey(j.openingDate) === m).map(j => Calc.job(j)); return { month: monthLabel(m), opened: jm.length, po: r2(sum(jm, x => x.actualPO)), plannedCost: r2(sum(jm, x => x.plannedCost)), actualCost: r2(sum(jm, x => x.actualCost)), actualGP: r2(sum(jm, x => x.actualGP)), invoiced: r2(sum(inv.filter(i => monthKey(i.invoiceDate) === m), i => r2(i.amount))), collected: r2(sum(pays.filter(p => monthKey(p.payDate) === m), p => r2(p.amount))) }; }); }, total: true,
   },
 ];
-function repCols(R) { return R.cols.map(([k, label, t = 'text']) => ({ k, label, t })).filter(c => c.t !== 'money' || can('viewFinancials')); }
+/* column → field permission (Settings → Roles → Fields) */
+const COL_FIELD = (k, rid) => (k === 'amount' && rid === 'misc') ? 'fld_costs' : /^zohoSo$/.test(k) ? 'fld_zohoSo' : /^(customerOrderNo|lpoDate)$/.test(k) ? 'fld_customerOrderNo' : /^endClient$/.test(k) ? 'fld_endClient' : /^(pe|se)$/.test(k) ? 'fld_engineers'
+  : /^(psDate|pfDate|actualStart|actualFinish|startDate|endDate)$/.test(k) ? 'fld_dates' : k === 'completionPct' ? 'fld_completion' : /^(poValue|plannedPO|actualPO|po)$/.test(k) ? 'fld_poValue'
+  : /GP|gpPct|gpVariance/.test(k) ? 'fld_margin' : /^(invoiced|paid|outstanding|collected|amount)$/.test(k) ? 'fld_invoicing' : /Cost|costVariance|^(materials|misc|manpower|total|unit|cost)$/.test(k) ? 'fld_costs' : null;
+const colOK = (k, rid) => { const f = COL_FIELD(k, rid); return !f || can(f); };
+function repCols(R) { return R.cols.map(([k, label, t = 'text']) => ({ k, label, t })).filter(c => (c.t !== 'money' || can('viewFinancials')) && colOK(c.k, R.id)); }
 function repFmt(c, v) { if (v == null || v === '') return c.t === 'pct' ? 'N/A' : '—'; if (c.t === 'money') return fmtN(v); if (c.t === 'num') return fmtN(v, 1); if (c.t === 'int') return fmtN(v, 0); if (c.t === 'pct') return pct(v); if (c.t === 'date') return fmtDate(v); return esc(v); }
 function repRaw(c, v) { if (v == null || v === '') return ''; if (c.t === 'money') return r2(v); if (c.t === 'pct') return Math.round(v * 100) / 100; return v; }
 function repData(R, f) {
@@ -3270,11 +3421,12 @@ function repData(R, f) {
   return { rows, cols, totals };
 }
 VIEWS.reports = (root, r) => {
-  const R = REPORTS.find(x => x.id === r.parts[1]);
+  const list = REPORTS.filter(x => can('report_' + x.id));
+  const R = list.find(x => x.id === r.parts[1]);
   if (!R) {
     setCrumbs([['Reports', '#/reports']]);
-    root.innerHTML = `<div class="page-head"><div class="t"><h1>Reports</h1><p>${REPORTS.length} standard reports generated from saved records. Filters, CSV / Excel export and print-to-PDF on every report.</p></div></div>
-    <div class="grid g12">${REPORTS.map(x => `<a class="card c4" href="#/reports/${x.id}" style="text-decoration:none;color:inherit;padding:16px 18px;display:block"><h2 style="display:flex;gap:8px;align-items:center">${ic(x.fin ? 'coins' : 'clipboard', 'sm')}${esc(x.name)}</h2><p class="small muted" style="margin:6px 0 0">${esc(x.desc)}</p>${x.fin && !can('viewFinancials') ? '<p class="small" style="margin:6px 0 0;color:var(--warning)">Financial columns hidden for your role</p>' : ''}</a>`).join('')}</div>`;
+    root.innerHTML = `<div class="page-head"><div class="t"><h1>Reports</h1><p>${list.length} standard reports generated from saved records. Filters, CSV / Excel export and print-to-PDF on every report.</p></div></div>
+    <div class="grid g12">${list.length ? list.map(x => `<a class="card c4" href="#/reports/${x.id}" style="text-decoration:none;color:inherit;padding:16px 18px;display:block"><h2 style="display:flex;gap:8px;align-items:center">${ic(x.fin ? 'coins' : 'clipboard', 'sm')}${esc(x.name)}</h2><p class="small muted" style="margin:6px 0 0">${esc(x.desc)}</p>${x.fin && !can('viewFinancials') ? '<p class="small" style="margin:6px 0 0;color:var(--warning)">Financial columns hidden for your role</p>' : ''}</a>`).join('') : `<div class="card c12 empty">${ic('lock')}<b>No reports are enabled for your role</b></div>`}</div>`;
     return;
   }
   setCrumbs([['Reports', '#/reports'], [R.name, '#/reports/' + R.id]]);
@@ -3308,10 +3460,12 @@ ACT.print = () => window.print();
    ===================================================================== */
 const SET_SECTIONS = [['general', 'Company & finance'], ['numbering', 'Job numbering'], ['lists', 'Statuses & categories'], ['calendar', 'Working calendar'], ['prefs', 'Notifications, files & export'], ['users', 'Users'], ['roles', 'Roles & permissions'], ['audit', 'Audit log'], ['data', 'Data & integrations'], ['tests', 'Acceptance tests']];
 VIEWS.settings = (root, r) => {
-  const sec = SET_SECTIONS.find(s => s[0] === r.parts[1]) ? r.parts[1] : 'general';
+  const allowed = SET_SECTIONS.filter(([k]) => can('set_' + k)).map(([k]) => k);
+  if (!allowed.length) { setCrumbs([['Settings', '#/settings']]); root.innerHTML = `<div class="card empty">${ic('lock')}<b>No settings sections are enabled for your role</b></div>`; return; }
+  const sec = SET_SECTIONS.find(s => s[0] === r.parts[1]) && allowed.includes(r.parts[1]) ? r.parts[1] : allowed[0];
   setCrumbs([['Settings', '#/settings'], [SET_SECTIONS.find(s => s[0] === sec)[1], '#/settings/' + sec]]);
   root.innerHTML = `<div class="page-head"><div class="t"><h1>Settings</h1><p>${can('manageSettings') ? 'Critical changes ask for a reason and are written to the audit log.' : 'Read-only — your role cannot change settings.'}</p></div></div>
-  <div class="set-grid"><nav class="set-nav" aria-label="Settings sections">${SET_SECTIONS.map(([k, l]) => `<a href="#/settings/${k}" ${k === sec ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav><div id="setBody"></div></div>`;
+  <div class="set-grid"><nav class="set-nav" aria-label="Settings sections">${SET_SECTIONS.filter(([k]) => allowed.includes(k)).map(([k, l]) => `<a href="#/settings/${k}" ${k === sec ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav><div id="setBody"></div></div>`;
   const b = $('#setBody', root);
   ({ general: setGeneral, numbering: setNumbering, lists: setLists, calendar: setCalendar, prefs: setPrefs, users: setUsers, roles: setRoles, audit: setAudit, data: setData, tests: setTests })[sec](b);
 };
@@ -3401,16 +3555,16 @@ ACT.userEdit = el => { const u = el.dataset.id ? get('users', el.dataset.id) : n
 function setRoles(root) {
   const mu = can('manageUsers'); const R = APP.db.roles; const groups = [...new Set(PERMS.map(p => p[2]))];
   root.innerHTML = `<section class="card"><div class="card-h"><h2>Permissions matrix</h2>${mu ? `<button class="btn primary sm" data-act="roleEdit">${ic('plus', 'sm')}New role</button>` : ''}</div>
-  <div class="card-b" style="padding:10px 0 0"><p class="small muted" style="margin:0 16px 10px">Every write is re-checked in the data layer (the browser emulates server rules today; in Supabase they become RLS policies and database functions). Field-level rules: financial values need “View financial data”; employee rates need “View employee cost rates”.</p>
+  <div class="card-b" style="padding:10px 0 0"><p class="small muted" style="margin:0 16px 10px">Every write is re-checked in the data layer (the browser emulates server rules today; in Supabase they become RLS policies and database functions). Field-level rules: financial values need “View financial data”; employee rates need “View employee cost rates”. The <b>Job tabs</b>, <b>Master data tabs</b>, <b>Reports</b>, <b>Settings tabs</b> and <b>Fields</b> groups let you switch individual tabs and columns on or off per role — a role that has never set one inherits its parent tab permission.</p>
   <div class="tbl-wrap" style="max-height:none"><table class="dt perm-table"><thead><tr><th>Permission</th>${R.map(r => `<th class="rot c" title="${esc(r.name)}">${esc(r.name)}${mu ? ` <button class="icon-btn" style="writing-mode:horizontal-tb" data-act="roleEdit" data-id="${r.id}" aria-label="Edit ${esc(r.name)}">${ic('edit', 'sm')}</button>` : ''}</th>`).join('')}</tr></thead>
   <tbody><tr><td><b>Job types in scope</b></td>${R.map(r => `<td class="c small">${(r.jobTypes || JOB_TYPES).map(t => t.split('/').map(x => x[0]).join('/')).join(' ')}</td>`).join('')}</tr>
-  ${groups.map(g => `<tr><td colspan="${R.length + 1}" style="background:#F7F9FD;font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">${g}</td></tr>` + PERMS.filter(p => p[2] === g).map(([k, l]) => `<tr><td>${esc(l)}</td>${R.map(r => `<td class="c">${r.permissions[k] ? `<span style="color:var(--success)" aria-label="Yes">${ic('check', 'sm')}</span>` : '<span class="faint" aria-label="No">·</span>'}</td>`).join('')}</tr>`).join('')).join('')}</tbody></table></div></div></section>`;
+  ${groups.map(g => `<tr><td colspan="${R.length + 1}" style="background:#F7F9FD;font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">${g}</td></tr>` + PERMS.filter(p => p[2] === g).map(([k, l]) => `<tr><td>${esc(l)}</td>${R.map(r => `<td class="c">${roleHas(r, k) ? `<span style="color:var(--success)" aria-label="Yes">${ic('check', 'sm')}</span>` : '<span class="faint" aria-label="No">·</span>'}</td>`).join('')}</tr>`).join('')).join('')}</tbody></table></div></div></section>`;
 }
 ACT.roleEdit = el => {
   const r = el.dataset.id ? get('roles', el.dataset.id) : null; const groups = [...new Set(PERMS.map(p => p[2]))];
   const fields = [{ k: 'name', label: 'Role name', req: true, span: 6 }, { k: 'jobTypes', label: 'Job types this role can access', type: 'multi', options: JOB_TYPES.map(t => [t, t]), span: 6 },
-  ...groups.flatMap(g => [{ k: 's_' + g, type: 'section', label: g }, ...PERMS.filter(p => p[2] === g).map(([k, l]) => ({ k: 'p_' + k, label: l, type: 'checkbox', span: 4 }))])];
-  const vals = r ? { name: r.name, jobTypes: r.jobTypes || JOB_TYPES, ...Object.fromEntries(PERMS.map(([k]) => ['p_' + k, !!r.permissions[k]])) } : { jobTypes: [...JOB_TYPES] };
+  ...groups.flatMap(g => [{ k: 's_' + g, type: 'section', label: g, hint: ['Job tabs', 'Master data tabs', 'Reports', 'Settings tabs', 'Fields'].includes(g) ? `<button type="button" class="btn ghost sm" data-act="permGroup" data-g="${esc(g)}" data-on="1">Select all</button> <button type="button" class="btn ghost sm" data-act="permGroup" data-g="${esc(g)}" data-on="0">Clear</button>` : '' }, ...PERMS.filter(p => p[2] === g).map(([k, l]) => ({ k: 'p_' + k, label: l.replace(/^(Job|Master|Report|Settings|Field) · /, ''), type: 'checkbox', span: 4 }))])];
+  const vals = r ? { name: r.name, jobTypes: r.jobTypes || JOB_TYPES, ...Object.fromEntries(PERMS.map(([k]) => ['p_' + k, r.permissions[k] === undefined ? roleHas(r, k) : !!r.permissions[k]])) } : { jobTypes: [...JOB_TYPES] };
   modalForm({ title: r ? `Edit role · ${esc(r.name)}` : 'New custom role', size: 'wide', fields, values: vals, extraFoot: r && !r.system ? `<button class="btn danger" type="button" data-act="roleDel" data-id="${r.id}">Delete role</button>` : '', onSubmit(v) { API.saveRole({ id: r?.id, name: v.name, jobTypes: v.jobTypes, permissions: Object.fromEntries(PERMS.map(([k]) => [k, !!v['p_' + k]])) }); toast('Role saved'); render(); } });
 };
 ACT.roleDel = async el => { const c = await confirmBox({ title: 'Delete role?', message: 'Delete this custom role?', confirm: 'Delete', danger: true }); if (!c.ok) return; try { API.deleteRole(el.dataset.id); MODAL_STACK.forEach(m => m.remove()); MODAL_STACK = []; toast('Role deleted'); render(); } catch (e) { showErr(e); } };
@@ -3502,7 +3656,7 @@ function runAcceptanceTests() {
     T(5, 'Actual cost 7,000 with PO 10,000 → GP 3,000 / 30%', () => { API.saveLine('actualMisc', { jobId: gp.id, category: 'Other', description: 'Act', amount: 7000, expenseDate: todayISO(), paymentMode: 'Cash' }); APP.cache = {}; const x = Calc.job(get('jobs', gp.id)); return { ok: x.actualGP === 3000 && Math.abs(x.actualGPPct - 30) < 1e-9 && x.costVariance === 1000, detail: `GP ${fmtN(x.actualGP)} · ${pct(x.actualGPPct, 2)} · cost variance +${fmtN(x.costVariance)} (unfavourable)` }; });
     let emp, asg, far;
     T(6, 'Assignment appears in roster calendar and job manpower plan', () => { as('role_super'); emp = API.saveMaster('employees', { name: 'Test Technician', code: 'TST-' + Date.now().toString(36), type: 'inhouse', category: 'Worker', costRate: 40, stdHoursPerDay: 8 }); far = addDays(todayISO(), 400); asg = API.saveAssignment({ employeeId: emp.id, jobId: svc.id, startDate: far, endDate: addDays(far, 4), allocationPct: 100, status: 'Assigned' }); APP.cache = {}; const line = L(svc.id, 'plannedManpower').find(l => l.assignmentId === asg.id); const st = dayState(get('employees', emp.id), isWorkDay(far) ? far : addDays(far, 2)); return { ok: !!line && line.employeeId === emp.id && ['Fully Booked'].includes(st.state), detail: `plan line ${line ? fmtN(line.hoursPerPerson, 0) + ' h @ ' + line.rate : 'missing'} · calendar state ${st.state}` }; });
-    T(7, 'Overlapping full-capacity booking is warned and blocked without override permission', () => { const rec = { employeeId: emp.id, jobId: gp.id, startDate: addDays(far, 1), endDate: addDays(far, 2), allocationPct: 100, status: 'Assigned' }; const warned = expectErr(() => API.saveAssignment({ ...rec }), 'conflicts'); as('role_pm'); const blocked = expectErr(() => API.saveAssignment({ ...rec }, { override: true, reason: 'test' }), 'forbidden'); as('role_hr'); const allowed = !expectErr(() => API.saveAssignment({ ...rec }, { override: true, reason: 'Authorised test override' })); as('role_super'); return { ok: warned && blocked && allowed, detail: `conflict raised=${warned} · PM override denied=${blocked} · HR (override permission) with reason allowed=${allowed}` }; });
+    T(7, 'Overlapping full-capacity booking is warned and blocked without override permission', () => { const wd = [0, 1, 2, 3, 4].map(n => addDays(far, n)).find(isWorkDay) || far; const rec = { employeeId: emp.id, jobId: gp.id, startDate: wd, endDate: wd, allocationPct: 100, status: 'Assigned' }; const warned = expectErr(() => API.saveAssignment({ ...rec }), 'conflicts'); as('role_pm'); const blocked = expectErr(() => API.saveAssignment({ ...rec }, { override: true, reason: 'test' }), 'forbidden'); as('role_hr'); const allowed = !expectErr(() => API.saveAssignment({ ...rec }, { override: true, reason: 'Authorised test override' })); as('role_super'); return { ok: warned && blocked && allowed, detail: `conflict raised=${warned} · PM override denied=${blocked} · HR (override permission) with reason allowed=${allowed}` }; });
     T(8, 'Closed job cannot be edited by ordinary users', () => { as('role_super'); API.closeJob(gp.id, { closureDate: todayISO(), financialsConfirmed: true, pendingConfirmed: true, comments: 'test' }); as('role_ops'); const j = get('jobs', gp.id); const a = expectErr(() => API.updateJob(gp.id, { description: 'hack' }, j.version), 'forbidden'); const b = expectErr(() => API.saveLine('actualMisc', { jobId: gp.id, category: 'Other', description: 'x', amount: 1, expenseDate: todayISO(), paymentMode: 'Cash' }), 'forbidden'); as('role_pm'); const c = expectErr(() => API.saveLine('plannedManpower', { jobId: gp.id, resourceName: 'x', resourceType: 'inhouse', headcount: 1, hoursPerPerson: 1, rate: 1 }), 'forbidden'); return { ok: a && b && c && get('jobs', gp.id).description === 'GP test', detail: `job edit denied=${a} · misc add denied=${b} · manpower add denied=${c}` }; });
     T(9, 'Invoice-permission user updates invoice status on a closed job; other fields stay locked', () => { as('role_super'); const inv = API.createInvoice(gp.id, { invoiceNo: 'TEST-INV-' + Date.now().toString(36), invoiceDate: todayISO(), amount: 10000 }); as('role_fin'); const before = JSON.stringify({ ...get('jobs', gp.id) }); API.setInvoiceStatus(inv.id, 'Partially Paid', { amount: 4000, payDate: todayISO(), ref: 'TT1' }); const st1 = get('invoices', inv.id).status; const noPaid = expectErr(() => API.setInvoiceStatus(inv.id, 'Paid', {}), 'validation'); const locked = expectErr(() => API.updateJob(gp.id, { poValue: 1 }, get('jobs', gp.id).version)); const after = JSON.stringify({ ...get('jobs', gp.id) }); return { ok: st1 === 'Partially Paid' && noPaid && locked && before === after, detail: `status → ${st1} · “Paid” without full payment rejected=${noPaid} · job fields unchanged=${before === after}` }; });
     T(10, 'Direct API edit of a closed job by an unauthorised account is denied', () => { as('role_ro'); const a = expectErr(() => API.updateJob(gp.id, { description: 'x' }, get('jobs', gp.id).version), 'forbidden'); const b = expectErr(() => API.reopenJob(gp.id, 'x'), 'forbidden'); const c = expectErr(() => API.deleteLine('actualMisc', L(gp.id, 'actualMisc')[0].id, 'x'), 'forbidden'); return { ok: a && b && c, detail: `update denied=${a} · reopen denied=${b} · delete denied=${c}` }; });
@@ -3521,6 +3675,7 @@ ACT.runTests = () => {
   $('#testOut').innerHTML = `<div class="alert ${ok === res.length ? 'ok' : 'err'}">${ic(ok === res.length ? 'success' : 'error')}<div><b>${ok} of ${res.length} passed</b> · run ${fmtDT(nowISO())} · your data was restored afterwards</div></div>` + res.map(r => `<div class="test-row" data-test="${r.id}" data-ok="${r.ok}"><span class="badge ${r.ok ? 'b-ok' : 'b-bad'}">${r.ok ? 'PASS' : 'FAIL'}</span><div><b>Test ${r.id}.</b> ${esc(r.name)}<div class="d">${esc(r.detail)}</div></div></div>`).join('');
 };
 
+ACT.permGroup = el => { const form = el.closest('form'); if (!form) return; PERMS.filter(p => p[2] === el.dataset.g).forEach(([k]) => { const c = form.querySelector(`[name="p_${k}"]`); if (c) c.checked = el.dataset.on === '1'; }); };
 
 </script>
 </body>
