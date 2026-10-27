@@ -2743,7 +2743,61 @@ function tabFinancials(root, job, x) {
     ${legend([{ name: 'Planned', color: 'var(--c2)' }, { name: 'Actual', color: 'var(--c1)' }, { name: 'Actual over plan', color: 'var(--danger)' }])}
     <h3 style="margin:18px 0 6px">PO value revisions</h3>
     ${L(job.id, 'poRevisions').length ? `<ul class="timeline-list">${L(job.id, 'poRevisions').map(p => `<li><span class="when">${fmtDT(p.at)}<br>${esc(nameOf('users', p.userId))}</span><span><b>${p.field === 'actualPoValue' ? 'Actual PO' : 'PO value'}</b>: ${fmtN(p.fromValue)} → ${fmtN(p.toValue)}<div class="small muted">${esc(p.reason)}</div></span></li>`).join('')}</ul>` : '<p class="small muted">No revisions — actual PO value equals the original PO value.</p>'}
-  </div></section></div>`;
+  </div></section></div>${finManpowerMatrix(job, x)}${finMaterialMatrix(job, x)}`;
+}
+/* ---- Financial summary: actual manpower cost by type → job title → person / outsourcing company ---- */
+function finManpowerMatrix(job, x) {
+  const A = L(job.id, 'actualManpower'); const cur = esc(APP.db.settings.currency);
+  const Z = () => ({ head: 0, hrs: 0, days: 0, cost: 0, kids: {} });
+  const add = (n, l) => { n.hrs += Calc.mpHours(l); n.days += Calc.days(l); n.cost = r2(n.cost + Calc.mp(l)); n._h = Math.max(n._h || 0, num(l.headcount)); };
+  const G = { inhouse: { ...Z(), label: 'In-house', sub: 'job title → person' }, outsourced: { ...Z(), label: 'Outsourced', sub: 'job title → outsourcing company' } };
+  for (const l of A) {
+    const emp = get('employees', l.employeeId); const type = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse';
+    const title = (emp && emp.title) || (emp ? 'No job title' : 'Unlisted resource');
+    const leafKey = type === 'inhouse' ? (emp ? emp.id : 'n:' + (l.resourceName || '?')) : (l.supplierId ? 's:' + l.supplierId : 'n:' + (l.resourceName || '?'));
+    const leafName = type === 'inhouse' ? (emp ? emp.name : (l.resourceName || 'Unnamed')) : (nameOf('suppliers', l.supplierId) || l.resourceName || 'Unnamed company');
+    const g = G[type]; const t = g.kids[title] ||= { ...Z(), label: title }; const p = t.kids[leafKey] ||= { ...Z(), label: leafName, emp: type === 'inhouse' ? emp?.id : null, people: new Set() };
+    add(g, l); add(t, l); add(p, l); if (type === 'outsourced') p.people.add(emp ? emp.id : 'n:' + (l.resourceName || '?') + '#' + num(l.headcount));
+  }
+  // headcount: a person counts once (their largest crew size on a line); a company = people on its lines; titles and groups add up their children
+  for (const g of Object.values(G)) { g.head = 0; for (const t of Object.values(g.kids)) { t.head = 0; for (const p of Object.values(t.kids)) { p.head = p.people?.size ? sum([...p.people], k => { const e = get('employees', k); return e ? 1 : Math.max(1, num(k.split('#')[1])); }) : (p._h || 1); t.head += p.head; } g.head += t.head; } }
+  const tot = { head: G.inhouse.head + G.outsourced.head, hrs: G.inhouse.hrs + G.outsourced.hrs, days: G.inhouse.days + G.outsourced.days, cost: r2(G.inhouse.cost + G.outsourced.cost) };
+  const cells = n => `<td class="r">${fmtN(n.head, 0)}</td><td class="r">${fmtN(n.hrs, 1)}</td><td class="r">${fmtN(n.days, n.days % 1 ? 1 : 0)}</td><td class="r">${fmtN(n.cost)}</td><td class="r">${tot.cost > 0 ? pct(n.cost / tot.cost * 100, 1) : '—'}</td>`;
+  const row = (cls, path, parent, depth, label, sub, n, leaf) => `<tr class="${leaf ? 'tt-sub' : 'click tt-row ' + cls}" ${leaf ? '' : 'data-act="toggleTitle" aria-expanded="false" tabindex="0"'} data-path="${path}" ${parent ? `data-parent="${parent}" hidden` : ''}><td style="padding-left:${16 + depth * 22}px"><span style="display:inline-flex;align-items:center;gap:6px">${leaf ? '<span style="width:15px;display:inline-block"></span>' : ic('chevron-right', 'sm chev')}<span>${label}${sub ? `<div class="small faint">${sub}</div>` : ''}</span></span></td>${cells(n)}</tr>`;
+  let body = '';
+  for (const [k, g] of Object.entries(G)) {
+    const titles = Object.values(g.kids).sort((a, b) => b.cost - a.cost); if (!titles.length) { body += `<tr class="tt-cat"><td><span style="display:inline-flex;align-items:center;gap:6px"><span style="width:15px;display:inline-block"></span><span><b>${g.label}</b><div class="small faint">no actual lines</div></span></span></td>${cells(g)}</tr>`; continue; }
+    body += row('tt-cat', k, null, 0, `<b>${g.label}</b>`, `${titles.length} job title${titles.length === 1 ? '' : 's'} · ${g.sub}`, g);
+    titles.forEach((t, ti) => { const tk = `${k}/t${ti}`; const leaves = Object.values(t.kids).sort((a, b) => b.cost - a.cost);
+      body += row('tt-title', tk, k, 1, `<b style="font-weight:600">${esc(t.label)}</b>`, `${leaves.length} ${k === 'inhouse' ? (leaves.length === 1 ? 'person' : 'people') : (leaves.length === 1 ? 'company' : 'companies')}`, t);
+      leaves.forEach((p, pi) => { body += row('', `${tk}/p${pi}`, tk, 2, p.emp ? `<a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.emp}">${esc(p.label)}</a>` : esc(p.label), '', p, true); });
+    });
+  }
+  return `<section class="card fin-mp" style="margin-top:14px"><div class="card-h"><h2>Actual manpower cost <span class="sub">· ${cur} · in-house by job title and person, outsourced by job title and company</span></h2><span class="small muted">Click a row to expand</span></div>
+    <div class="card-b" style="padding:10px 0 0">${A.length ? `<div class="tbl-wrap"><table class="dt fit"><thead><tr><th scope="col">Resource type / job title / ${'person or company'}</th><th class="r" scope="col" title="People: a person counts once; crew lines without a listed employee count their headcount">Headcount</th><th class="r" scope="col">Hours</th><th class="r" scope="col">Days</th><th class="r" scope="col">Cost</th><th class="r" scope="col">% of manpower</th></tr></thead><tbody>${body}</tbody>
+    <tfoot><tr style="font-weight:700"><td>Total · in-house + outsourced</td>${cells(tot)}</tr></tfoot></table></div>
+    <p class="small muted" style="padding:10px 16px 14px;margin:0">Hours = headcount × hours/person/day × days per line; cost = hours × rate. In-house ${fmtN(G.inhouse.cost)} + outsourced ${fmtN(G.outsourced.cost)} = ${fmtN(tot.cost)}${Math.abs(tot.cost - x.actualManpower) > 0.005 ? ` (financial summary shows ${fmtN(x.actualManpower)})` : ' — matches the actual manpower line above'}.</p>` : `<div class="empty" style="padding:22px">${ic('users')}<b>No actual manpower yet</b>Actual manpower lines appear here grouped by job title.</div>`}</div></section>`;
+}
+/* ---- Financial summary: actual materials consolidated by material (purchases + store transfers), no supplier ---- */
+function finMaterialMatrix(job, x) {
+  const cur = esc(APP.db.settings.currency);
+  const lines = [
+    ...L(job.id, 'actualMaterials').map(l => ({ name: l.description, uom: l.uom, qty: num(l.qty), cost: Calc.qty(l), date: l.purchaseDate, ref: l.poNo ? 'PO ' + l.poNo : (l.supplierRef || 'purchase'), src: 'Purchase' })),
+    ...L(job.id, 'inventoryTransfers').filter(t => t.status === 'Posted').map(t => { const it = get('inventoryItems', t.itemId); return { name: it ? it.name : 'Store item', uom: t.uom || it?.uom, qty: num(t.qty), cost: Calc.tr(t), date: t.transferDate, ref: 'Transfer ' + t.ref, src: 'Store' }; }),
+  ];
+  const M = {}; for (const l of lines) { const k = (l.name || '').trim().toLowerCase() + '|' + (l.uom || '').toUpperCase(); const m = M[k] ||= { name: (l.name || '').trim() || 'Unnamed material', uom: l.uom || '', qty: 0, cost: 0, n: 0, lines: [] }; m.qty = r2(m.qty + l.qty); m.cost = r2(m.cost + l.cost); m.n++; m.lines.push(l); }
+  const mats = Object.values(M).sort((a, b) => b.cost - a.cost); const tot = { qty: null, cost: r2(sum(mats, m => m.cost)), n: lines.length };
+  const cells = (m, isTot) => `<td class="r">${isTot ? '<span class="faint">—</span>' : fmtN(m.qty, 2)}</td><td>${isTot ? '' : esc(m.uom)}</td><td class="r">${isTot ? '<span class="faint">—</span>' : m.qty > 0 ? fmtN(m.cost / m.qty, 2) : '—'}</td><td class="r">${fmtN(m.cost)}</td><td class="r">${tot.cost > 0 ? pct(m.cost / tot.cost * 100, 1) : '—'}</td>`;
+  let body = '';
+  mats.forEach((m, i) => {
+    const pk = 'm' + i; const multi = m.lines.length > 1;
+    body += `<tr class="${multi ? 'click tt-row tt-title' : 'tt-row tt-title'}" ${multi ? 'data-act="toggleTitle" aria-expanded="false" tabindex="0"' : ''} data-path="${pk}"><td style="padding-left:16px"><span style="display:inline-flex;align-items:center;gap:6px">${multi ? ic('chevron-right', 'sm chev') : '<span style="width:15px;display:inline-block"></span>'}<span><b style="font-weight:600">${esc(m.name)}</b><div class="small faint">${m.n} line${m.n === 1 ? '' : 's'}${m.lines.some(l => l.src === 'Store') ? (m.lines.every(l => l.src === 'Store') ? ' · store transfers' : ' · purchases + store') : ''}</div></span></span></td>${cells(m)}</tr>`;
+    if (multi) m.lines.sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach((l, li) => { body += `<tr class="tt-sub" data-path="${pk}/${li}" data-parent="${pk}" hidden><td style="padding-left:38px"><span class="small">${fmtDate(l.date)} · ${esc(l.ref)}</span></td><td class="r">${fmtN(l.qty, 2)}</td><td>${esc(l.uom || '')}</td><td class="r">${l.qty > 0 ? fmtN(l.cost / l.qty, 2) : '—'}</td><td class="r">${fmtN(l.cost)}</td><td class="r"><span class="faint">·</span></td></tr>`; });
+  });
+  return `<section class="card fin-mt" style="margin-top:14px"><div class="card-h"><h2>Actual material used <span class="sub">· ${cur} · consolidated by material (purchases and store transfers)</span></h2><span class="small muted">${mats.length} material${mats.length === 1 ? '' : 's'} · ${lines.length} line${lines.length === 1 ? '' : 's'}</span></div>
+    <div class="card-b" style="padding:10px 0 0">${mats.length ? `<div class="tbl-wrap"><table class="dt fit"><thead><tr><th scope="col">Material</th><th class="r" scope="col">Quantity</th><th scope="col">Unit</th><th class="r" scope="col" title="Total cost ÷ total quantity">Avg. unit price</th><th class="r" scope="col">Total cost</th><th class="r" scope="col">% of material</th></tr></thead><tbody>${body}</tbody>
+    <tfoot><tr style="font-weight:700"><td>Total · all materials</td>${cells(tot, true)}</tr></tfoot></table></div>
+    <p class="small muted" style="padding:10px 16px 14px;margin:0">Same material name and unit are added together; expand a material to see its individual purchase / transfer lines. Total ${fmtN(tot.cost)}${Math.abs(tot.cost - x.actualMaterial) > 0.005 ? ` (financial summary shows ${fmtN(x.actualMaterial)})` : ' — matches the actual material line above'}.</p>` : `<div class="empty" style="padding:22px">${ic('package')}<b>No actual materials yet</b>Purchases and store transfers appear here consolidated by material.</div>`}</div></section>`;
 }
 function tabInvoices(root, job, x) {
   const I = L(job.id, 'invoices'); const ci = can('changeInvoiceStatus'), rp = can('recordPayments');
