@@ -583,6 +583,8 @@ const PERMS = [
   ['set_general', 'Settings · Company & finance', 'Settings tabs'], ['set_numbering', 'Settings · Job numbering', 'Settings tabs'], ['set_lists', 'Settings · Statuses & categories', 'Settings tabs'], ['set_calendar', 'Settings · Working calendar', 'Settings tabs'],
   ['set_prefs', 'Settings · Notifications, files & export', 'Settings tabs'], ['set_users', 'Settings · Users', 'Settings tabs'], ['set_roles', 'Settings · Roles & permissions', 'Settings tabs'], ['set_audit', 'Settings · Audit log', 'Settings tabs'],
   ['set_data', 'Settings · Data & integrations', 'Settings tabs'], ['set_tests', 'Settings · Acceptance tests', 'Settings tabs'],
+  ['deact_customers', 'Deactivate / reactivate companies & customers', 'Deactivate records'], ['deact_endClients', 'Deactivate / reactivate end-clients', 'Deactivate records'], ['deact_suppliers', 'Deactivate / reactivate suppliers', 'Deactivate records'],
+  ['deact_inhouse', 'Deactivate / reactivate in-house employees', 'Deactivate records'], ['deact_outsourced', 'Deactivate / reactivate outsourced employees', 'Deactivate records'], ['deact_items', 'Deactivate / reactivate store items', 'Deactivate records'],
   /* --- fine-grained: fields / columns --- */
   ['fld_zohoSo', 'Field · Zoho SO #', 'Fields'], ['fld_customerOrderNo', 'Field · Customer order # & LPO date', 'Fields'], ['fld_endClient', 'Field · End-client', 'Fields'],
   ['fld_engineers', 'Field · Project / service engineer', 'Fields'], ['fld_dates', 'Field · Planned & actual dates (PS / PF / start / finish)', 'Fields'], ['fld_completion', 'Field · Completion %', 'Fields'],
@@ -591,7 +593,7 @@ const PERMS = [
   ['fld_storeCost', 'Field · Store item unit cost & stock value (opening cost, weighted average, receipt cost)', 'Fields'], ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
 ];
 /* A fine-grained permission a role has never set (older roles, or a role saved before the option existed) inherits its parent. */
-const PERM_PARENT = p => p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
+const PERM_PARENT = p => p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p === 'deact_items' ? 'manageStores' : p === 'deact_suppliers' ? ['manageMaster', 'manageStores'] : p.startsWith('deact_') ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
   : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_storeCost' ? ['viewFinancials', 'manageMaster', 'manageStores'] : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
 /* money-type fields are only visible with View financial data, whatever the field switch says */
 const PERM_REQUIRES = { fld_poValue: 'viewFinancials', fld_costs: 'viewFinancials', fld_margin: 'viewFinancials', fld_invoicing: 'viewFinancials', set_users: 'manageUsers' };
@@ -1256,6 +1258,7 @@ const API = {
   saveMaster(t, d, version, opts = {}) {
     const quick = opts.quick && !d.id && (['customers', 'endClients', 'employees'].includes(t) && can('quickAddMaster') || (t === 'suppliers' && (can('quickAddMaster') || can('manageStores'))));
     if (!quick) { if (t === 'inventoryItems') need('manageStores'); else if (t === 'suppliers') { if (!can('manageMaster') && !can('manageStores')) deny('Permission required: Manage master data or Manage stores'); } else need('manageMaster'); } else if (!APP.user?.active) deny();
+    if (d.id) { const ex0 = get(t, d.id); if (ex0 && (ex0.status || 'Active') !== (d.status || 'Active')) { const sec = t === 'employees' ? (ex0.type === 'outsourced' ? 'outsourced' : 'inhouse') : t === 'inventoryItems' ? 'items' : t; if (!can('deact_' + sec)) deny(`Your role cannot ${d.status === 'Inactive' ? 'deactivate' : 'reactivate'} ${TABLE_LABEL[t].toLowerCase()} records.`); } }
     const e = {}; vReq(d, 'name', 'Name', e);
     const codeKey = t === 'inventoryItems' ? 'sku' : 'code'; vReq(d, codeKey, 'Code', e);
     if (d[codeKey] && APP.db[t].some(r => r.id !== d.id && !r.archived && String(r[codeKey]).toLowerCase() === String(d[codeKey]).trim().toLowerCase())) e[codeKey] = 'Code already in use';
@@ -1269,11 +1272,11 @@ const API = {
       if (can('viewCostRates')) { vNum(d, 'costRate', 'Cost rate', { min: 0 }, e); vNum(d, 'agreedRate', 'Agreed rate', { min: 0 }, e); }
       else { const ex = d.id && get(t, d.id); d.costRate = ex ? ex.costRate : null; d.agreedRate = ex ? ex.agreedRate : null; }
     }
-    if (t === 'inventoryItems') { vNum(d, 'qtyOnHand', 'Qty on hand', { min: 0 }, e); vNum(d, 'avgCost', 'Average cost', { min: 0 }, e); if (d.group && !itemGroups().some(g => g.group === d.group)) e.group = 'Unknown group — add it in Settings → Statuses & categories'; if (d.subGroup && !subGroupsOf(d.group).includes(d.subGroup)) e.subGroup = 'Sub-group does not belong to the selected group'; if (!d.group) d.subGroup = ''; if (d.id) { const ex = get(t, d.id); d.qtyOnHand = ex.qtyOnHand; d.avgCost = ex.avgCost; d.stock = ex.stock; } else { d.stock = { [mainStore()]: { qty: num(d.qtyOnHand), avgCost: num(d.avgCost) } }; d.qtyOnHand = r2(num(d.qtyOnHand)); } delete d.store; }
+    if (t === 'inventoryItems') { vNum(d, 'qtyOnHand', 'Qty on hand', { min: 0 }, e); vNum(d, 'avgCost', 'Average cost', { min: 0 }, e); if (d.group && !itemGroups().some(g => g.group === d.group)) e.group = 'Unknown group — add it in Settings → Statuses & categories'; if (d.subGroup && !subGroupsOf(d.group).includes(d.subGroup)) e.subGroup = 'Sub-group does not belong to the selected group'; if (!d.group) d.subGroup = ''; if (d.id) { const ex = get(t, d.id); d.qtyOnHand = ex.qtyOnHand; d.stock = ex.stock; if (isSuperAdmin() && isNum(d.avgCost) && Math.abs(num(d.avgCost) - num(ex.avgCost)) > 1e-9) { const sm = clone(stockMap(ex)); for (const st of Object.values(sm)) st.avgCost = num(d.avgCost); d.stock = sm; d.avgCost = num(d.avgCost); d._costReason = `Unit cost overridden by Super Admin: ${fmtN(ex.avgCost, 4)} → ${fmtN(d.avgCost, 4)}`; } else d.avgCost = ex.avgCost; } else { d.stock = { [mainStore()]: { qty: num(d.qtyOnHand), avgCost: num(d.avgCost) } }; d.qtyOnHand = r2(num(d.qtyOnHand)); } delete d.store; }
     if (t === 'endClients') d.customerIds = Array.isArray(d.customerIds) ? d.customerIds : (d.customerIds ? [d.customerIds] : []);
     done(e);
     return tx(() => {
-      if (d.id) { const r = get(t, d.id); checkVersion(r, version); const b = clone(r); Object.assign(r, d); stampUpd(r); audit('update', t, r.id, b, r); return r; }
+      if (d.id) { const r = get(t, d.id); checkVersion(r, version); const b = clone(r); const why = d._costReason; delete d._costReason; Object.assign(r, d); stampUpd(r); audit('update', t, r.id, b, r, why); return r; }
       const r = stampNew({ ...d, id: uid(t.slice(0, 3)), status: d.status || 'Active' }); APP.db[t].push(r); audit('create', t, r.id, null, r); return r;
     });
   },
@@ -1634,8 +1637,8 @@ const legend = items => `<div class="chart-legend">${items.map(s => `<span><i cl
 /* ---------------- export ---------------- */
 function safeCell(v) { if (v == null) return ''; if (typeof v === 'number') return v; const s = String(v); return /^[=+\-@\t\r]/.test(s) && isNaN(+s) ? "'" + s : s; }
 function download(name, content, mime) { const b = new Blob([content], { type: mime }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
-function exportCSV(name, headers, rows) {
-  if (APP.db.settings.exportRequiresPermission !== false) need('exportReports');
+function exportCSV(name, headers, rows, opts = {}) {
+  if (APP.db.settings.exportRequiresPermission !== false && !(opts.allowed && opts.allowed.some(p => can(p)))) need('exportReports');
   const q = v => { v = safeCell(v); if (typeof v === 'number') return String(v); return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
   download(name + '.csv', '﻿' + [headers.map(q).join(','), ...rows.map(r => r.map(q).join(','))].join('\r\n'), 'text/csv;charset=utf-8');
   tx(() => audit('export', 'report', name, null, { format: 'csv', rows: rows.length }));
@@ -3352,7 +3355,7 @@ const MASTER = {
   items: {
     label: 'Store items', one: 'store item', icon: 'package', table: 'inventoryItems',
     cols: [{ k: 'sku', label: 'SKU', fmt: r => `<span class="mono">${esc(r.sku)}</span>` }, { k: 'name', label: 'Item', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${esc(r.category || '')}</div>` }, { k: 'group', label: 'Group / sub-group', fmt: r => r.group ? `${esc(r.group)}${r.subGroup ? `<div class="small faint">${esc(r.subGroup)}</div>` : ''}` : '<span class="faint">—</span>', val: r => `${r.group || ''} ${r.subGroup || ''}` }, { k: 'qtyOnHand', label: 'On hand', r: 1, fmt: r => `${fmtN(r.qtyOnHand, 2)} <span class="faint">${esc(r.uom)}</span>` }, { k: 'avgCost', label: 'Weighted avg. cost', r: 1, fmt: r => can('fld_storeCost') ? fmtN(r.avgCost, 4) : '<span class="faint">•••</span>', val: r => can('fld_storeCost') ? r.avgCost : 0 }, { k: 'value', label: 'Stock value', r: 1, val: r => can('fld_storeCost') ? num(r.qtyOnHand) * num(r.avgCost) : 0, fmt: r => can('fld_storeCost') ? fmtN(r2(num(r.qtyOnHand) * num(r.avgCost))) : '<span class="faint">•••</span>' }],
-    fields: (rec) => [{ k: 'name', label: 'Item name', req: true, span: 8 }, { k: 'sku', label: 'Item / SKU code', req: true, span: 4 }, { k: 'group', label: 'Group', type: 'select', options: itemGroups().map(g => g.group), span: 4, placeholder: '— Select group —', hint: itemGroups().length ? '' : 'Define groups in Settings → Statuses & categories' }, { k: 'subGroup', label: 'Sub-group', type: 'select', options: subGroupsOf(rec?.group), span: 4, placeholder: '— Select sub-group —', hint: 'Follows the group' }, { k: 'category', label: 'Cost category', type: 'select', options: APP.db.settings.materialCategories, span: 4 }, { k: 'uom', label: 'Unit', type: 'select', options: APP.db.settings.uoms, span: 4 },  { k: 'qtyOnHand', label: 'Opening quantity', type: 'number', min: 0, span: 6, readonly: !!rec, hint: rec ? 'Changed via stock receipts and transfers' : '' }, { k: 'avgCost', label: `Opening unit cost (${APP.db.settings.currency})`, type: 'number', min: 0, span: 6, readonly: !!rec, hidden: !can('fld_storeCost'), hint: rec ? 'Weighted average — changes via stock receipts' : 'Cost per unit of the opening stock' }],
+    fields: (rec) => [{ k: 'name', label: 'Item name', req: true, span: 8 }, { k: 'sku', label: 'Item / SKU code', req: true, span: 4 }, { k: 'group', label: 'Group', type: 'select', options: itemGroups().map(g => g.group), span: 4, placeholder: '— Select group —', hint: itemGroups().length ? '' : 'Define groups in Settings → Statuses & categories' }, { k: 'subGroup', label: 'Sub-group', type: 'select', options: subGroupsOf(rec?.group), span: 4, placeholder: '— Select sub-group —', hint: 'Follows the group' }, { k: 'category', label: 'Cost category', type: 'select', options: APP.db.settings.materialCategories, span: 4 }, { k: 'uom', label: 'Unit', type: 'select', options: APP.db.settings.uoms, span: 4 },  { k: 'qtyOnHand', label: 'Opening quantity', type: 'number', min: 0, span: 6, readonly: !!rec, hint: rec ? 'Changed via stock receipts and transfers' : '' }, { k: 'avgCost', label: rec ? `Unit cost — weighted average (${APP.db.settings.currency})` : `Opening unit cost (${APP.db.settings.currency})`, type: 'number', min: 0, span: 6, readonly: !!rec && !isSuperAdmin(), hidden: !can('fld_storeCost'), hint: rec ? (isSuperAdmin() ? 'Super Admin may correct it — the new cost is applied to the stock in every store and written to the audit log' : 'Weighted average — changes via GRNs') : 'Cost per unit of the opening stock' }],
   },
 };
 VIEWS.master = (root, r) => {
@@ -3366,7 +3369,7 @@ VIEWS.master = (root, r) => {
   rows = sortRows(rows, M.cols, s.sort, s.dir); const pages = Math.max(1, Math.ceil(rows.length / s.size)); s.page = Math.min(s.page, pages);
   const mm = can('manageMaster') || (sec === 'suppliers' && can('manageStores'));
   const cols = [...M.cols, { k: 'status', label: 'Status', fmt: x => `<span class="badge ${(x.status || 'Active') === 'Active' ? 'b-ok' : ''}">${esc(x.status || 'Active')}</span>` },
-  { k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: x => `${M.extra ? M.extra(x) : ''}<button class="icon-btn" data-act="mView" data-sec="${sec}" data-id="${x.id}" aria-label="View details">${ic('eye', 'sm')}</button>${mm ? `<button class="icon-btn" data-act="mEdit" data-sec="${sec}" data-id="${x.id}" aria-label="Edit">${ic('edit', 'sm')}</button><button class="btn ghost sm" data-act="mToggle" data-sec="${sec}" data-id="${x.id}">${(x.status || 'Active') === 'Active' ? 'Deactivate' : 'Activate'}</button>` : ''}` }];
+  { k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: x => `${M.extra ? M.extra(x) : ''}<button class="icon-btn" data-act="mView" data-sec="${sec}" data-id="${x.id}" aria-label="View details">${ic('eye', 'sm')}</button>${mm ? `<button class="icon-btn" data-act="mEdit" data-sec="${sec}" data-id="${x.id}" aria-label="Edit">${ic('edit', 'sm')}</button>${can('deact_' + sec) ? `<button class="btn ghost sm" data-act="mToggle" data-sec="${sec}" data-id="${x.id}">${(x.status || 'Active') === 'Active' ? 'Deactivate' : 'Activate'}</button>` : ''}` : ''}` }];
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>Master data</h1><p>Shared reference records used by jobs, costing and the roster. Inactive records stay linked to history but can't be chosen for new work.</p></div>
     <div class="actions">${can('exportReports') ? `<button class="btn" data-act="mExport" data-sec="${sec}">${ic('download', 'sm')}Export CSV</button>` : ''}${mm && sec === 'items' && can('fld_storeCost') ? `<button class="btn primary" data-act="newGRN">${ic('truck', 'sm')}New GRN</button>` : ''}${mm ? `<button class="btn ${sec === 'items' ? '' : 'primary'}" data-act="mEdit" data-sec="${sec}">${ic('plus', 'sm')}New ${esc(M.one)}</button>` : ''}</div></div>
@@ -3378,7 +3381,7 @@ VIEWS.master = (root, r) => {
 CHG.mf = el => { const s = VS['m_' + el.dataset.sec]; s[el.dataset.k] = el.value; s.page = 1; rerender(); };
 ACT.mEdit = el => {
   const M = MASTER[el.dataset.sec]; const rec = el.dataset.id ? get(M.table, el.dataset.id) : null;
-  const fields = M.fields(rec);
+  const fields = M.fields(rec); if (rec && !can('deact_' + el.dataset.sec)) fields.forEach(f => { if (f.k === 'status') f.readonly = true; });
   modalForm({
     title: `${rec ? 'Edit' : 'New'} ${esc(M.one)}`, size: 'wide', fields, values: rec ? { ...rec } : { ...(M.defaults || {}), status: 'Active' },
     onChange: M.table === 'inventoryItems' ? (v, el, e) => { if (e && e.target.name !== 'group') return; const sel = $('[name=subGroup]', el); if (!sel) return; const keep = sel.value; sel.innerHTML = opt(subGroupsOf(v.group), subGroupsOf(v.group).includes(keep) ? keep : '', '— Select sub-group —'); } : undefined,
@@ -3488,15 +3491,15 @@ VIEWS.stores = (root, r) => {
   const counts = Object.fromEntries(S.map(st => [st, live('inventoryItems').filter(i => (i.status || 'Active') === 'Active' && stockAt(i, st).qty > 0).length]));
   root.innerHTML = `
   <div class="page-head"><div class="t"><h1>Stores</h1><p>${S.map(st => `<b>${esc(st)}</b> · ${counts[st]} item${counts[st] === 1 ? '' : 's'} in stock`).join(' &nbsp;·&nbsp; ')}. GRNs are received into <b>${esc(S[0])}</b>; use Stock transfer to move stock between stores.</p></div>
-    <div class="actions">${can('exportReports') ? `<button class="btn" data-act="stExport">${ic('download', 'sm')}Export CSV</button>` : ''}${ms ? `<button class="btn" data-act="stMove">${ic('truck', 'sm')}Stock transfer</button>` : ''}${ms && sc ? `<button class="btn primary" data-act="newGRN">${ic('package', 'sm')}New GRN</button>` : ''}${ms ? `<button class="btn" data-act="mEdit" data-sec="items">${ic('plus', 'sm')}New store item</button>` : ''}</div></div>
+    <div class="actions">${(can('exportReports') || can('manageStores')) && tab === 'items' ? `<button class="btn" data-act="stExport" title="Exports the rows currently shown (search, store and status filters applied)">${ic('download', 'sm')}Export CSV</button>` : ''}${ms ? `<button class="btn" data-act="stMove">${ic('truck', 'sm')}Stock transfer</button>` : ''}${ms && sc ? `<button class="btn primary" data-act="newGRN">${ic('package', 'sm')}New GRN</button>` : ''}${ms ? `<button class="btn" data-act="mEdit" data-sec="items">${ic('plus', 'sm')}New store item</button>` : ''}</div></div>
   <nav class="tabs" role="tablist">${STORE_TABS.map(([k, l]) => `<a role="tab" href="#/stores/${k}" aria-selected="${k === tab}">${ic(k === 'items' ? 'package' : 'clipboard', 'sm')}${l}</a>`).join('')}</nav>
   <div id="stBody"></div>`;
   const body = $('#stBody', root);
   if (tab === 'items') storeItems(body, s, S, ms, sc); else storeMoves(body, s, S, sc);
 };
+function storeItemRows(s) { const q = (s.q || '').toLowerCase(); return live('inventoryItems').filter(x => (!s.status || (x.status || 'Active') === s.status) && (!s.store || stockAt(x, s.store).qty > 0) && (!q || JSON.stringify([x.name, x.sku, x.category, x.group, x.subGroup]).toLowerCase().includes(q))); }
 function storeItems(root, s, S, ms, sc) {
-  const q = s.q.toLowerCase(); const M = MASTER.items;
-  let rows = live('inventoryItems').filter(x => (!s.status || (x.status || 'Active') === s.status) && (!s.store || stockAt(x, s.store).qty > 0) && (!q || JSON.stringify([x.name, x.sku, x.category, x.group, x.subGroup]).toLowerCase().includes(q)));
+  let rows = storeItemRows(s);
   const cols = [
     { k: 'sku', label: 'SKU', fmt: r => `<span class="mono">${esc(r.sku)}</span>` },
     { k: 'name', label: 'Item', fmt: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${[r.group, r.subGroup].filter(Boolean).map(esc).join(' › ') || esc(r.category || '')}</div>` },
@@ -3505,7 +3508,7 @@ function storeItems(root, s, S, ms, sc) {
     { k: 'avgCost', label: 'Weighted avg. cost', r: 1, fmt: r => sc ? fmtN(r.avgCost, 4) : '<span class="faint">•••</span>', val: r => sc ? r.avgCost : 0 },
     { k: 'value', label: 'Stock value', r: 1, val: r => sc ? num(r.qtyOnHand) * num(r.avgCost) : 0, fmt: r => sc ? fmtN(r2(num(r.qtyOnHand) * num(r.avgCost))) : '<span class="faint">•••</span>' },
     { k: 'status', label: 'Status', fmt: x => `<span class="badge ${(x.status || 'Active') === 'Active' ? 'b-ok' : ''}">${esc(x.status || 'Active')}</span>` },
-    { k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: x => `<button class="icon-btn" data-act="mView" data-sec="items" data-id="${x.id}" aria-label="View details">${ic('eye', 'sm')}</button>${ms ? `<button class="icon-btn" data-act="mEdit" data-sec="items" data-id="${x.id}" aria-label="Edit">${ic('edit', 'sm')}</button><button class="btn ghost sm" data-act="mToggle" data-sec="items" data-id="${x.id}">${(x.status || 'Active') === 'Active' ? 'Deactivate' : 'Activate'}</button>` : ''}` },
+    { k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: x => `<button class="icon-btn" data-act="mView" data-sec="items" data-id="${x.id}" aria-label="View details">${ic('eye', 'sm')}</button>${ms ? `<button class="icon-btn" data-act="mEdit" data-sec="items" data-id="${x.id}" aria-label="Edit">${ic('edit', 'sm')}</button>${can('deact_items') ? `<button class="btn ghost sm" data-act="mToggle" data-sec="items" data-id="${x.id}">${(x.status || 'Active') === 'Active' ? 'Deactivate' : 'Activate'}</button>` : ''}` : ''}` },
   ];
   rows = sortRows(rows, cols, s.sort, s.dir); const pages = Math.max(1, Math.ceil(rows.length / s.size)); s.page = Math.min(s.page, pages);
   const tot = { qty: null, value: r2(sum(rows, r => num(r.qtyOnHand) * num(r.avgCost))) };
@@ -3541,7 +3544,7 @@ function storeMoves(root, s, S, sc) {
 }
 CHG.stf = el => { const s = VS.stores; s[el.dataset.k] = el.value; s.page = 1; s.mpage = 1; rerender(); };
 ACT.stMPage = el => { VS.stores.mpage = +el.dataset.p; rerender(); };
-ACT.stExport = () => { const S = stores(); const rows = live('inventoryItems'); exportCSV('store-items', ['SKU', 'Item', 'Group', 'Sub-group', 'Cost category', 'Unit', ...S.flatMap(st => [`${st} qty`, `${st} avg cost`]), 'Total on hand', 'Weighted avg cost', 'Stock value', 'Status'], rows.map(r => [r.sku, r.name, r.group || '', r.subGroup || '', r.category || '', r.uom, ...S.flatMap(st => [stockAt(r, st).qty, can('fld_storeCost') ? stockAt(r, st).avgCost : '']), r.qtyOnHand, can('fld_storeCost') ? r.avgCost : '', can('fld_storeCost') ? r2(num(r.qtyOnHand) * num(r.avgCost)) : '', r.status || 'Active'])); };
+ACT.stExport = () => { const S = stores(); const s = VS.stores || {}; const cols = [{ k: 'sku' }, { k: 'name' }, ...S.map(st => ({ k: 'st_' + st, val: r => stockAt(r, st).qty })), { k: 'qtyOnHand' }, { k: 'avgCost' }, { k: 'value', val: r => num(r.qtyOnHand) * num(r.avgCost) }]; const rows = sortRows(storeItemRows(s), cols, s.sort, s.dir); const name = ['store-items', s.store ? s.store.replace(/\s+/g, '-').toLowerCase() : '', s.status ? s.status.toLowerCase() : 'all-statuses'].filter(Boolean).join('-'); exportCSV(name, ['SKU', 'Item', 'Group', 'Sub-group', 'Cost category', 'Unit', ...S.flatMap(st => [`${st} qty`, `${st} avg cost`]), 'Total on hand', 'Weighted avg cost', 'Stock value', 'Status'], rows.map(r => [r.sku, r.name, r.group || '', r.subGroup || '', r.category || '', r.uom, ...S.flatMap(st => [stockAt(r, st).qty, can('fld_storeCost') ? stockAt(r, st).avgCost : '']), r.qtyOnHand, can('fld_storeCost') ? r.avgCost : '', can('fld_storeCost') ? r2(num(r.qtyOnHand) * num(r.avgCost)) : '', r.status || 'Active']), { allowed: ['manageStores'] }); toast(`${rows.length} item${rows.length === 1 ? '' : 's'} exported${s.store ? ' · ' + s.store : ''}`); };
 /* Stock transfer between stores — same multi-item layout as GRN */
 ACT.stMove = () => {
   const S = stores(); const token = uid('tok'); const cur = esc(APP.db.settings.currency);
