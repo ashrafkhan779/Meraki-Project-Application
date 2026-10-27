@@ -1254,8 +1254,8 @@ const API = {
 
   /* ---------- master data ---------- */
   saveMaster(t, d, version, opts = {}) {
-    const quick = opts.quick && !d.id && ['customers', 'endClients', 'employees'].includes(t) && can('quickAddMaster');
-    if (!quick) need(t === 'inventoryItems' ? 'manageStores' : 'manageMaster'); else if (!APP.user?.active) deny();
+    const quick = opts.quick && !d.id && (['customers', 'endClients', 'employees'].includes(t) && can('quickAddMaster') || (t === 'suppliers' && (can('quickAddMaster') || can('manageStores'))));
+    if (!quick) { if (t === 'inventoryItems') need('manageStores'); else if (t === 'suppliers') { if (!can('manageMaster') && !can('manageStores')) deny('Permission required: Manage master data or Manage stores'); } else need('manageMaster'); } else if (!APP.user?.active) deny();
     const e = {}; vReq(d, 'name', 'Name', e);
     const codeKey = t === 'inventoryItems' ? 'sku' : 'code'; vReq(d, codeKey, 'Code', e);
     if (d[codeKey] && APP.db[t].some(r => r.id !== d.id && !r.archived && String(r[codeKey]).toLowerCase() === String(d[codeKey]).trim().toLowerCase())) e[codeKey] = 'Code already in use';
@@ -2993,7 +2993,7 @@ ACT.addLine = el => el.dataset.t === 'actualMaterials' ? openPurchaseForm(get('j
 function openPurchaseForm(job) {
   const S = APP.db.settings; const token = uid('tok');
   const head = [
-    { k: 'supplierId', label: 'Vendor / supplier', type: 'select', options: supOpts(), span: 6, placeholder: '— Select vendor —' },
+    { k: 'supplierId', label: 'Vendor / supplier', type: 'select', options: supOpts(), span: 6, placeholder: '— Select vendor —', add: canAddSupplier() ? 'supplier' : null },
     { k: 'purchaseDate', label: 'Purchase date', type: 'date', req: true, span: 6 },
     { k: 'poNo', label: 'Purchase order (PO) #', span: 6, hint: 'Your PO number to the vendor' }, { k: 'supplierRef', label: 'Supplier invoice / reference no.', span: 6 },
     { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 }, ...reasonField(job),
@@ -3143,6 +3143,7 @@ ACT.restoreJob = el => { API.restoreJob(el.dataset.id); toast('Job restored'); r
 
 /* ---------------- quick-create master records from the job form ---------------- */
 const canQuickAdd = () => can('manageMaster') || can('quickAddMaster');
+const canAddSupplier = () => can('manageMaster') || can('quickAddMaster') || can('manageStores');
 function nextCode(table, prefix, filter) {
   let mx = 0; for (const r of APP.db[table]) { if (filter && !filter(r)) continue; const m = String(r.code || '').match(new RegExp('^' + prefix.replace(/[-]/g, '\\-') + '(\\d+)$')); if (m) mx = Math.max(mx, +m[1]); }
   return prefix + String(mx + 1).padStart(3, '0');
@@ -3152,6 +3153,7 @@ ACT.quickAdd = el => {
   const cfg = {
     customer: { t: 'customers', title: 'New company / customer', fields: [{ k: 'name', label: 'Company name', req: true, span: 8 }, { k: 'code', label: 'Customer code', req: true, span: 4 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'trn', label: 'TRN / VAT number', span: 6 }, { k: 'paymentTerms', label: 'Payment terms', span: 6 }, { k: 'address', label: 'Address', span: 6 }], vals: { code: nextCode('customers', 'C-'), paymentTerms: 'Net 30' } },
     endClient: { t: 'endClients', title: 'New end-client', fields: [{ k: 'name', label: 'End-client name', req: true, span: 8 }, { k: 'code', label: 'Client code', req: true, span: 4 }, { k: 'customerIds', label: 'Related companies', type: 'multi', options: live('customers').filter(c => c.status === 'Active').map(c => [c.id, c.name]), span: 12, hint: 'Pre-selected: the company chosen on this job' }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'address', label: 'Address / site', span: 6 }], vals: { code: nextCode('endClients', 'E-'), customerIds: form.querySelector('[name=customerId]')?.value ? [form.querySelector('[name=customerId]').value] : [] } },
+    supplier: { t: 'suppliers', title: 'New supplier', fields: [{ k: 'name', label: 'Supplier name', req: true, span: 8 }, { k: 'code', label: 'Supplier code', req: true, span: 4 }, { k: 'category', label: 'Supplier category', type: 'select', options: ['Materials', 'Manpower', 'Equipment', 'Logistics', 'Accommodation', 'Services', 'Other'], span: 6 }, { k: 'paymentTerms', label: 'Payment terms', span: 6 }, { k: 'contactPerson', label: 'Contact person', span: 6 }, { k: 'email', label: 'Email', type: 'email', span: 6 }, { k: 'phone', label: 'Phone', span: 6 }, { k: 'trn', label: 'TRN / VAT number', span: 6 }, { k: 'address', label: 'Address', span: 12 }], vals: { code: nextCode('suppliers', 'SUP-'), category: 'Materials' } },
     pe: { t: 'employees', title: 'New project engineer', emp: 'Project Engineer', dept: 'Projects' },
     se: { t: 'employees', title: 'New service engineer', emp: 'Service Engineer', dept: 'Operations' },
   }[kind];
@@ -3161,7 +3163,7 @@ ACT.quickAdd = el => {
   }
   modalForm({
     title: cfg.title, size: 'wide', submit: 'Create & select', fields: cfg.fields, values: cfg.vals,
-    intro: `<p class="small muted" style="margin-top:0">Saved to Master Data and selected on this job. Your other job entries are kept.${can('manageMaster') ? '' : ' Full details can be completed later by a master-data administrator.'}</p>`,
+    intro: `<p class="small muted" style="margin-top:0">Saved to Master Data and selected on this form. Your other entries are kept.${can('manageMaster') ? '' : ' Full details can be completed later by a master-data administrator.'}</p>`,
     onSubmit(v) {
       const dup = APP.db[cfg.t].find(r => !r.archived && String(r.name).trim().toLowerCase() === String(v.name || '').trim().toLowerCase() && (!cfg.emp || r.type === 'inhouse'));
       if (dup) invalid(`“${dup.name}” already exists${dup.status !== 'Active' ? ' (inactive — reactivate it in Master Data)' : ' — select it from the list'}.`, { name: 'Already exists' });
@@ -3362,7 +3364,7 @@ VIEWS.master = (root, r) => {
   const q = s.q.toLowerCase();
   let rows = APP.db[M.table].filter(x => !x.archived && (!M.filter || M.filter(x)) && (!s.status || (x.status || 'Active') === s.status) && (!q || JSON.stringify([x.name, x.code, x.sku, x.contactPerson, x.email, x.title, x.category, x.group, x.subGroup]).toLowerCase().includes(q)));
   rows = sortRows(rows, M.cols, s.sort, s.dir); const pages = Math.max(1, Math.ceil(rows.length / s.size)); s.page = Math.min(s.page, pages);
-  const mm = can('manageMaster');
+  const mm = can('manageMaster') || (sec === 'suppliers' && can('manageStores'));
   const cols = [...M.cols, { k: 'status', label: 'Status', fmt: x => `<span class="badge ${(x.status || 'Active') === 'Active' ? 'b-ok' : ''}">${esc(x.status || 'Active')}</span>` },
   { k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: x => `${M.extra ? M.extra(x) : ''}<button class="icon-btn" data-act="mView" data-sec="${sec}" data-id="${x.id}" aria-label="View details">${ic('eye', 'sm')}</button>${mm ? `<button class="icon-btn" data-act="mEdit" data-sec="${sec}" data-id="${x.id}" aria-label="Edit">${ic('edit', 'sm')}</button><button class="btn ghost sm" data-act="mToggle" data-sec="${sec}" data-id="${x.id}">${(x.status || 'Active') === 'Active' ? 'Deactivate' : 'Activate'}</button>` : ''}` }];
   root.innerHTML = `
@@ -3405,7 +3407,7 @@ ACT.newGRN = () => {
   const items = live('inventoryItems').filter(i => i.status !== 'Inactive').sort(by('sku', 1));
   const sups = live('suppliers').filter(x => x.status !== 'Inactive').sort(by('name', 1));
   const head = [
-    { k: 'supplierId', label: 'Supplier', type: 'select', options: sups.map(x => [x.id, x.name]), span: 6, placeholder: '— Select supplier —' },
+    { k: 'supplierId', label: 'Supplier', type: 'select', options: sups.map(x => [x.id, x.name]), span: 6, placeholder: '— Select supplier —', add: canAddSupplier() ? 'supplier' : null },
     { k: 'receiptDate', label: 'Date received', type: 'date', req: true, span: 6 },
     { k: 'grnNo', label: 'GRN #', req: true, span: 4, hint: 'Goods receipt note number — must be unique' }, { k: 'lpoNo', label: 'LPO #', span: 4, hint: 'Your purchase order to the supplier' }, { k: 'ref', label: 'Supplier invoice / delivery note', span: 4 },
     { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 },
