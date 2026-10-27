@@ -395,6 +395,20 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .pi-table td{padding:6px 6px;vertical-align:middle}.pi-table th{white-space:nowrap}.pi-table input,.pi-table select{width:100%;min-width:0;margin:0}.pi-table input.invalid,.pi-table select.invalid{border-color:var(--danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger) 25%,transparent)}.pi-table .pi-total{font-family:var(--f-num)}
 .pi-table tfoot td{border-top:1px solid var(--rule);padding-top:10px}
 
+/* print — financial summary: job header + summary only, everything expanded */
+@media print{
+  body.print-fin .job-head .actions,body.print-fin .lockbar,body.print-fin .tabs,body.print-fin .crumbs{display:none!important}
+  body.print-fin .print-title{display:block!important;margin:0 0 10px}
+  body.print-fin .fin-mp tr[hidden],body.print-fin .fin-mt tr[hidden]{display:table-row!important}
+  body.print-fin .fin-mp .chev,body.print-fin .fin-mt .chev{display:none}
+  body.print-fin .card{break-inside:avoid;border:1px solid #ddd;margin-bottom:12px}
+  body.print-fin .grid.g12{display:block}body.print-fin .grid.g12>.card{width:100%;margin-bottom:12px}
+  body.print-fin .job-head{border:1px solid #ddd;padding:12px;margin-bottom:12px}
+  body.print-fin .fin-strip{display:flex;gap:18px;flex-wrap:wrap}
+  body.print-fin .pva .bar{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:A4 portrait;margin:12mm}
+}
+
 </style>
 </head>
 <body>
@@ -2618,7 +2632,7 @@ VIEWS.job = (root, r) => {
         ${can('jobDelete') ? (job.archived ? `<button class="btn" data-act="restoreJob" data-id="${job.id}">Restore</button>` : `<button class="btn danger" data-act="archiveJob" data-id="${job.id}">${ic('trash', 'sm')}Archive</button>`) : ''}
       </div></div>
     <div style="margin-top:6px;font-weight:600">${esc(job.description)}</div>
-    <div class="meta"><span>Company <b>${esc(nameOf('customers', job.customerId) || '—')}</b></span>${F('endClient') ? `<span>End-client <b>${esc(nameOf('endClients', job.endClientId) || '—')}</b></span>` : ''}<span>Opened <b>${fmtDate(job.openingDate)}</b></span>${F('dates') ? `<span>Plan <b>${fmtDate(job.psDate)} → ${fmtDate(job.pfDate)}</b></span>` : ''}${F('completion') ? `<span>Completion <b>${num(job.completionPct)}%</b></span>` : ''}${job.locked ? `<span>Closed <b>${fmtDate(job.closureDate)}</b> by <b>${esc(nameOf('users', job.closedBy))}</b></span>` : ''}</div>
+    <div class="meta">${F('zohoSo') ? `<span>Zoho SO # <b>${esc(job.zohoSo || '—')}</b></span>` : ''}${F('customerOrderNo') ? `<span>Customer order # <b>${esc(job.customerOrderNo || '—')}</b></span>` : ''}<span>Company <b>${esc(nameOf('customers', job.customerId) || '—')}</b></span>${F('endClient') ? `<span>End-client <b>${esc(nameOf('endClients', job.endClientId) || '—')}</b></span>` : ''}<span>Opened <b>${fmtDate(job.openingDate)}</b></span>${F('dates') ? `<span>Plan <b>${fmtDate(job.psDate)} → ${fmtDate(job.pfDate)}</b></span>` : ''}${F('completion') ? `<span>Completion <b>${num(job.completionPct)}%</b></span>` : ''}${job.locked ? `<span>Closed <b>${fmtDate(job.closureDate)}</b> by <b>${esc(nameOf('users', job.closedBy))}</b></span>` : ''}</div>
     ${fin ? `<div class="fin-strip">
       ${F('poValue') ? `<div><div class="fl">PO value</div><div class="fv">${compact(x.actualPO)}</div><div class="fs">${x.actualPO !== x.plannedPO ? 'orig. ' + compact(x.plannedPO) : esc(APP.db.settings.currency)}</div></div>` : ''}
       ${F('costs') ? `<div><div class="fl">Planned cost</div><div class="fv">${compact(x.plannedCost)}</div><div class="fs">${F('margin') ? pct(x.plannedGPPct) + ' planned GP' : ''}</div></div>
@@ -2731,7 +2745,7 @@ function tabFinancials(root, job, x) {
     ['Total cost', x.plannedCost, x.actualCost, 'cost', '', 1], ['Gross profit (GP)', x.plannedGP, x.actualGP, 'rev', '', 1],
   ];
   const mx = Math.max(1, ...rows.slice(1, 4).flatMap(r => [r[1], r[2]]));
-  root.innerHTML = `<div class="grid g12">
+  root.innerHTML = `<div class="actions no-print" style="justify-content:flex-end;margin:-4px 0 10px"><button class="btn" data-act="printFin">${ic('print', 'sm')}Print / PDF — financial summary</button></div><div class="print-title" style="display:none"><h1 style="margin:0 0 2px">Financial summary · ${esc(job.jobNo)}</h1><div class="small muted">${esc(APP.db.settings.companyName || '')} · printed ${fmtDT(nowISO())} by ${esc(APP.user?.name || '')}</div></div><div class="grid g12">
   <section class="card c7"><div class="card-h"><h2>Planned vs actual</h2><span class="sub">${esc(APP.db.settings.currency)} · revenue rule: ${APP.db.settings.revenueRule === 'invoiced' ? 'invoiced amount' : 'PO value (revised if approved)'}</span></div>
     <div class="card-b" style="padding:10px 0 0"><div class="tbl-wrap"><table class="dt"><thead><tr><th>Line</th><th class="r">Planned</th><th class="r">Actual</th><th class="r">Variance</th><th>Result</th></tr></thead><tbody>
     ${rows.map(([l, p, a, k, note, b]) => { const v = r2(a - p); const fav = k === 'cost' ? v < 0 : v > 0; return `<tr ${b ? 'style="font-weight:700"' : ''}><td>${l}${note ? `<div class="small faint" style="font-weight:400">${esc(note)}</div>` : ''}</td><td class="r">${fmtN(p)}</td><td class="r">${fmtN(a)}</td><td class="r">${varHTML(v, k === 'cost')}</td><td>${Math.abs(v) < .005 ? '<span class="badge nodot">On plan</span>' : fav ? '<span class="badge b-ok">Favourable</span>' : '<span class="badge b-bad">Unfavourable</span>'}</td></tr>`; }).join('')}
@@ -2748,8 +2762,9 @@ function tabFinancials(root, job, x) {
 /* ---- Financial summary: actual manpower cost by type → job title → person / outsourcing company ---- */
 function finManpowerMatrix(job, x) {
   const A = L(job.id, 'actualManpower'); const cur = esc(APP.db.settings.currency);
-  const Z = () => ({ head: 0, hrs: 0, days: 0, cost: 0, kids: {} });
-  const add = (n, l) => { n.hrs += Calc.mpHours(l); n.days += Calc.days(l); n.cost = r2(n.cost + Calc.mp(l)); n._h = Math.max(n._h || 0, num(l.headcount)); };
+  const Z = () => ({ head: 0, hrs: 0, dates: new Set(), cost: 0, kids: {} });
+  const lineDates = l => { const out = []; if (!validDate(l.dateFrom) || !l.dateFrom) return out; let d = l.dateFrom; const end = l.dateTo && validDate(l.dateTo) && l.dateTo >= l.dateFrom ? l.dateTo : l.dateFrom; for (let i = 0; d <= end && i < 400; i++) { out.push(d); d = addDays(d, 1); } return out; };
+  const add = (n, l) => { n.hrs += Calc.mpHours(l); lineDates(l).forEach(d => n.dates.add(d)); n.cost = r2(n.cost + Calc.mp(l)); n._h = Math.max(n._h || 0, num(l.headcount)); };
   const G = { inhouse: { ...Z(), label: 'In-house', sub: 'job title → person' }, outsourced: { ...Z(), label: 'Outsourced', sub: 'job title → outsourcing company' } };
   for (const l of A) {
     const emp = get('employees', l.employeeId); const type = l.resourceType === 'outsourced' ? 'outsourced' : 'inhouse';
@@ -2761,8 +2776,8 @@ function finManpowerMatrix(job, x) {
   }
   // headcount: a person counts once (their largest crew size on a line); a company = people on its lines; titles and groups add up their children
   for (const g of Object.values(G)) { g.head = 0; for (const t of Object.values(g.kids)) { t.head = 0; for (const p of Object.values(t.kids)) { p.head = p.people?.size ? sum([...p.people], k => { const e = get('employees', k); return e ? 1 : Math.max(1, num(k.split('#')[1])); }) : (p._h || 1); t.head += p.head; } g.head += t.head; } }
-  const tot = { head: G.inhouse.head + G.outsourced.head, hrs: G.inhouse.hrs + G.outsourced.hrs, days: G.inhouse.days + G.outsourced.days, cost: r2(G.inhouse.cost + G.outsourced.cost) };
-  const cells = n => `<td class="r">${fmtN(n.head, 0)}</td><td class="r">${fmtN(n.hrs, 1)}</td><td class="r">${fmtN(n.days, n.days % 1 ? 1 : 0)}</td><td class="r">${fmtN(n.cost)}</td><td class="r">${tot.cost > 0 ? pct(n.cost / tot.cost * 100, 1) : '—'}</td>`;
+  const tot = { head: G.inhouse.head + G.outsourced.head, hrs: G.inhouse.hrs + G.outsourced.hrs, dates: new Set([...G.inhouse.dates, ...G.outsourced.dates]), cost: r2(G.inhouse.cost + G.outsourced.cost) };
+  const cells = n => `<td class="r">${fmtN(n.head, 0)}</td><td class="r">${fmtN(n.hrs, 1)}</td><td class="r" title="Distinct calendar days with work on them">${fmtN(n.dates.size, 0)}</td><td class="r">${fmtN(n.cost)}</td><td class="r">${tot.cost > 0 ? pct(n.cost / tot.cost * 100, 1) : '—'}</td>`;
   const row = (cls, path, parent, depth, label, sub, n, leaf) => `<tr class="${leaf ? 'tt-sub' : 'click tt-row ' + cls}" ${leaf ? '' : 'data-act="toggleTitle" aria-expanded="false" tabindex="0"'} data-path="${path}" ${parent ? `data-parent="${parent}" hidden` : ''}><td style="padding-left:${16 + depth * 22}px"><span style="display:inline-flex;align-items:center;gap:6px">${leaf ? '<span style="width:15px;display:inline-block"></span>' : ic('chevron-right', 'sm chev')}<span>${label}${sub ? `<div class="small faint">${sub}</div>` : ''}</span></span></td>${cells(n)}</tr>`;
   let body = '';
   for (const [k, g] of Object.entries(G)) {
@@ -2773,10 +2788,10 @@ function finManpowerMatrix(job, x) {
       leaves.forEach((p, pi) => { body += row('', `${tk}/p${pi}`, tk, 2, p.emp ? `<a class="jobno" style="font-family:var(--f-body);font-size:13px;font-weight:500" href="#/roster?emp=${p.emp}">${esc(p.label)}</a>` : esc(p.label), '', p, true); });
     });
   }
-  return `<section class="card fin-mp" style="margin-top:14px"><div class="card-h"><h2>Actual manpower cost <span class="sub">· ${cur} · in-house by job title and person, outsourced by job title and company</span></h2><span class="small muted">Click a row to expand</span></div>
-    <div class="card-b" style="padding:10px 0 0">${A.length ? `<div class="tbl-wrap"><table class="dt fit"><thead><tr><th scope="col">Resource type / job title / ${'person or company'}</th><th class="r" scope="col" title="People: a person counts once; crew lines without a listed employee count their headcount">Headcount</th><th class="r" scope="col">Hours</th><th class="r" scope="col">Days</th><th class="r" scope="col">Cost</th><th class="r" scope="col">% of manpower</th></tr></thead><tbody>${body}</tbody>
+  return `<section class="card fin-mp" style="margin-top:14px"><div class="card-h"><h2>Actual manpower cost <span class="sub">· ${cur} · in-house by job title and person, outsourced by job title and company</span></h2><span class="small muted no-print">Click a row to expand</span></div>
+    <div class="card-b" style="padding:10px 0 0">${A.length ? `<div class="tbl-wrap"><table class="dt fit"><thead><tr><th scope="col">Resource type / job title / ${'person or company'}</th><th class="r" scope="col" title="People: a person counts once; crew lines without a listed employee count their headcount">Headcount</th><th class="r" scope="col">Hours</th><th class="r" scope="col" title="Distinct calendar days — two people on the same day count as one day">Days</th><th class="r" scope="col">Cost</th><th class="r" scope="col">% of manpower</th></tr></thead><tbody>${body}</tbody>
     <tfoot><tr style="font-weight:700"><td>Total · in-house + outsourced</td>${cells(tot)}</tr></tfoot></table></div>
-    <p class="small muted" style="padding:10px 16px 14px;margin:0">Hours = headcount × hours/person/day × days per line; cost = hours × rate. In-house ${fmtN(G.inhouse.cost)} + outsourced ${fmtN(G.outsourced.cost)} = ${fmtN(tot.cost)}${Math.abs(tot.cost - x.actualManpower) > 0.005 ? ` (financial summary shows ${fmtN(x.actualManpower)})` : ' — matches the actual manpower line above'}.</p>` : `<div class="empty" style="padding:22px">${ic('users')}<b>No actual manpower yet</b>Actual manpower lines appear here grouped by job title.</div>`}</div></section>`;
+    <p class="small muted" style="padding:10px 16px 14px;margin:0">Hours = headcount × hours/person/day × days per line; cost = hours × rate. Days = distinct calendar days taken from the work dates (two people on the same day count as one day; a title or total never adds its rows' days). In-house ${fmtN(G.inhouse.cost)} + outsourced ${fmtN(G.outsourced.cost)} = ${fmtN(tot.cost)}${Math.abs(tot.cost - x.actualManpower) > 0.005 ? ` (financial summary shows ${fmtN(x.actualManpower)})` : ' — matches the actual manpower line above'}.</p>` : `<div class="empty" style="padding:22px">${ic('users')}<b>No actual manpower yet</b>Actual manpower lines appear here grouped by job title.</div>`}</div></section>`;
 }
 /* ---- Financial summary: actual materials consolidated by material (purchases + store transfers), no supplier ---- */
 function finMaterialMatrix(job, x) {
@@ -2941,6 +2956,8 @@ function openLineForm(t, job, rec) {
   });
 }
 const readFormSafe = (el, fields) => readForm($('form', el), fields);
+/* print the job header + the whole financial summary (all matrix rows expanded) */
+ACT.printFin = () => { document.body.classList.add('print-fin'); const done = () => { document.body.classList.remove('print-fin'); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); setTimeout(() => { window.print(); setTimeout(done, 1500); }, 50); };
 ACT.addLine = el => el.dataset.t === 'actualMaterials' ? openPurchaseForm(get('jobs', el.dataset.job)) : openLineForm(el.dataset.t, get('jobs', el.dataset.job));
 /* Add purchase: one vendor / date / PO / invoice ref, many material items — saved as one line per item */
 function openPurchaseForm(job) {
