@@ -1301,8 +1301,8 @@ const API = {
     if (!d.jobTypes || !d.jobTypes.length) invalid('Select at least one job type the role can access.');
     return tx(() => {
       if (d.id) {
-        const r = get('roles', d.id); const b = clone(r); Object.assign(r, { name: d.name.trim(), permissions: d.permissions, jobTypes: d.jobTypes });
-        if (!APP.db.users.some(u => u.active && roleOf(u)?.permissions.manageUsers)) invalid('This change would leave no active user able to manage users.');
+        const r = get('roles', d.id); const b = clone(r); Object.assign(r, { name: d.name.trim(), permissions: d.permissions, jobTypes: d.jobTypes }); stampUpd(r);
+        if (!APP.db.users.some(u => u.active && roleHas(roleOf(u), 'manageUsers'))) invalid('This change would leave no active user able to manage users.');
         audit('update', 'roles', r.id, b, r, d.reason); return r;
       }
       const r = { id: uid('role'), name: d.name.trim(), system: false, jobTypes: d.jobTypes, permissions: d.permissions }; APP.db.roles.push(r); audit('create', 'roles', r.id, null, r); return r;
@@ -1758,8 +1758,11 @@ const Store = {
       const b = new Map((before[t] || []).map(r => [r.id, JSON.stringify(r)]));
       const seen = new Set();
       for (const r of APP.db[t]) {
-        seen.add(r.id); const s = JSON.stringify(r);
-        if (b.get(r.id) !== s) { (up[t] ||= []).push(JSON.parse(s)); any = true; }
+        seen.add(r.id); let s = JSON.stringify(r);
+        if (b.get(r.id) !== s) {
+          const prev = b.get(r.id); if (prev && t !== 'auditLog') { const pv = JSON.parse(prev).version; if (num(r.version) <= num(pv)) { r.version = num(pv) + 1; r.updatedAt = r.updatedAt || nowISO(); s = JSON.stringify(r); } } // changed without a version bump → bump it
+          (up[t] ||= []).push(JSON.parse(s)); any = true;
+        }
       }
       for (const id of b.keys()) if (!seen.has(id)) { (del[t] ||= []).push(id); any = true; }
     }
