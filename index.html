@@ -409,6 +409,11 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
   @page{size:A4 portrait;margin:12mm}
 }
 
+/* searchable store-item picker */
+.ipick{position:relative}.ipick .ipick-q{width:100%}
+.ipick-list{position:fixed;z-index:1200;background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 10px 30px rgba(15,23,42,.14);max-height:260px;overflow:auto;padding:4px}
+.ipick-opt{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;line-height:1.3}.ipick-opt[aria-selected=true],.ipick-opt:hover{background:var(--accent-bg,#EEF3FF)}.ipick-opt[aria-disabled=true]{cursor:default;background:none}
+
 </style>
 </head>
 <body>
@@ -1684,8 +1689,47 @@ function exportXLS(name, headers, rows) {
   tx(() => audit('export', 'report', name, null, { format: 'xls', rows: rows.length }));
 }
 
+/* ---------------- searchable store-item picker (type SKU / name / group) ---------------- */
+const ITEM_PICK = { open: null };
+function itemPickerHTML(value = '') { const it = value && get('inventoryItems', value); return `<div class="ipick"><input type="text" class="ipick-q" placeholder="Type SKU or item name…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" value="${it ? esc(it.sku + ' · ' + it.name) : ''}"><input type="hidden" name="itemId" value="${esc(value)}"></div>`; }
+function ipickItems() { return live('inventoryItems').filter(i => i.status !== 'Inactive'); }
+function ipickClose() { const o = ITEM_PICK.open; if (!o) return; o.list.remove(); o.q.setAttribute('aria-expanded', 'false'); ITEM_PICK.open = null; }
+function ipickRender(q, text) {
+  const wrap = q.closest('.ipick'); const hid = wrap.querySelector('[name=itemId]');
+  const terms = (text || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const all = ipickItems(); const hits = (terms.length ? all.filter(i => { const h = `${i.sku} ${i.name} ${i.group || ''} ${i.subGroup || ''} ${i.category || ''}`.toLowerCase(); return terms.every(t => h.includes(t)); }) : all).slice(0, 12);
+  ipickClose(); const list = document.createElement('div'); list.className = 'ipick-list'; list.setAttribute('role', 'listbox');
+  list.innerHTML = hits.length ? hits.map((i, n) => `<div class="ipick-opt" role="option" data-id="${i.id}" aria-selected="${n === 0}"><b>${esc(i.sku)}</b> · ${esc(i.name)}<div class="small faint">${[i.group, i.subGroup].filter(Boolean).map(esc).join(' › ') || esc(i.category || '')} · ${fmtN(i.qtyOnHand, 2)} ${esc(i.uom)} on hand</div></div>`).join('') : `<div class="ipick-opt faint" aria-disabled="true">No item matches “${esc(text)}”</div>`;
+  const r = q.getBoundingClientRect(); list.style.left = r.left + 'px'; list.style.top = (r.bottom + 2) + 'px'; list.style.width = Math.max(r.width, 320) + 'px';
+  document.body.appendChild(list); q.setAttribute('aria-expanded', 'true'); ITEM_PICK.open = { q, hid, list };
+}
+function ipickChoose(id) {
+  const o = ITEM_PICK.open; if (!o) return; const it = get('inventoryItems', id); if (!it) return;
+  o.hid.value = it.id; o.q.value = `${it.sku} · ${it.name}`; o.q.classList.remove('invalid'); ipickClose();
+  o.hid.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function bindItemPicker() {
+  document.addEventListener('focusin', e => { if (e.target.matches('.ipick-q')) { e.target.select(); ipickRender(e.target, e.target.value && e.target.closest('.ipick').querySelector('[name=itemId]').value ? '' : e.target.value); } });
+  document.addEventListener('input', e => {
+    if (!e.target.matches('.ipick-q')) return;
+    const hid = e.target.closest('.ipick').querySelector('[name=itemId]'); if (hid.value) { hid.value = ''; hid.dispatchEvent(new Event('change', { bubbles: true })); } // typing again clears the previous choice
+    ipickRender(e.target, e.target.value);
+  });
+  document.addEventListener('keydown', e => {
+    const o = ITEM_PICK.open; if (!o || e.target !== o.q) return;
+    const opts = [...o.list.querySelectorAll('.ipick-opt[data-id]')]; let i = opts.findIndex(x => x.getAttribute('aria-selected') === 'true');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!opts.length) return; i = (i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length; opts.forEach((x, n) => x.setAttribute('aria-selected', n === i)); opts[i].scrollIntoView({ block: 'nearest' }); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (opts[i]) ipickChoose(opts[i].dataset.id); }
+    else if (e.key === 'Escape') { e.stopPropagation(); ipickClose(); }
+    else if (e.key === 'Tab') ipickClose();
+  }, true);
+  document.addEventListener('mousedown', e => { const opt = e.target.closest('.ipick-opt[data-id]'); if (opt) { e.preventDefault(); ipickChoose(opt.dataset.id); return; } if (ITEM_PICK.open && !e.target.closest('.ipick-list') && e.target !== ITEM_PICK.open.q) ipickClose(); });
+  document.addEventListener('focusout', e => { if (e.target.matches('.ipick-q')) setTimeout(() => { const o = ITEM_PICK.open; if (o && o.q === e.target && document.activeElement !== e.target) { if (!o.hid.value) e.target.value = ''; ipickClose(); } }, 150); });
+  document.addEventListener('scroll', e => { if (ITEM_PICK.open && !e.target.closest?.('.ipick-list')) ipickClose(); }, true);
+}
 /* ---------------- global listeners ---------------- */
 function bindGlobal() {
+  bindItemPicker();
   if (!$('#toasts')) document.body.insertAdjacentHTML('beforeend', '<div class="toasts" id="toasts" role="status" aria-live="polite"></div><div class="tip" id="tip" role="tooltip"></div>');
   document.addEventListener('click', e => {
     const d = e.target.closest('[data-drill]'); if (d) { location.hash = d.dataset.drill; return; }
@@ -3122,8 +3166,7 @@ ACT.addTransfer = el => {
     { k: 'costSource', label: 'Costing method', type: 'select', span: 4, options: [['weighted_average', 'Weighted average store cost'], ['manual', 'Manual — confirmed unit cost per item']], req: true },
     { k: 'comments', label: 'Comments', type: 'textarea', rows: 2, span: 12 }, ...reasonField(job),
   ];
-  const itemOpts = () => `<option value="">— Select store item —</option>` + items.map(i => `<option value="${i.id}">${esc(i.sku)} · ${esc(i.name)}</option>`).join('');
-  const rowHTML = () => `<tr class="pi-row"><td><select name="itemId">${itemOpts()}</select><div class="small faint pi-onhand" style="margin-top:3px"></div></td><td><input type="number" name="qty" step="any" min="0" inputmode="decimal" placeholder="0"></td><td class="pi-uom muted">—</td><td><input type="number" name="unitCost" step="any" min="0" inputmode="decimal" placeholder="avg" disabled></td><td class="r pi-total mono">0.00</td><td class="r pi-after mono small muted">—</td><td class="row-actions"><button type="button" class="icon-btn danger" data-pi="del" aria-label="Remove item">${ic('trash', 'sm')}</button></td></tr>`;
+  const rowHTML = () => `<tr class="pi-row"><td>${itemPickerHTML()}<div class="small faint pi-onhand" style="margin-top:3px"></div></td><td><input type="number" name="qty" step="any" min="0" inputmode="decimal" placeholder="0"></td><td class="pi-uom muted">—</td><td><input type="number" name="unitCost" step="any" min="0" inputmode="decimal" placeholder="avg" disabled></td><td class="r pi-total mono">0.00</td><td class="r pi-after mono small muted">—</td><td class="row-actions"><button type="button" class="icon-btn danger" data-pi="del" aria-label="Remove item">${ic('trash', 'sm')}</button></td></tr>`;
   const body = `<form novalidate>${formGrid(head, { transferDate: todayISO(), ref: sugg, costSource: 'weighted_average', issuedBy: 'Storekeeper', store: mainStore() })}
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)"><h3 style="margin:0 0 8px">Items issued <span class="small muted" style="font-weight:400">· all items on this transfer note</span></h3>
     <div class="tbl-wrap" style="max-height:none"><table class="dt pi-table"><thead><tr><th style="width:36%">Store item</th><th style="width:12%">Qty</th><th style="width:8%">Unit</th><th style="width:14%">Unit cost (${cur})</th><th class="r" style="width:13%">Total</th><th class="r" style="width:12%">Left in store</th><th></th></tr></thead>
@@ -3151,7 +3194,7 @@ ACT.addTransfer = el => {
         $('#trPrev', el).innerHTML = `${ic('info', 'sm')}<div>${n || 'No'} item${n === 1 ? '' : 's'} from <b>${esc(st)}</b> · total <b>${fin ? cur + ' ' + fmtN(g) : '•••'}</b> charged to ${esc(job.jobNo)} as actual material cost${manual ? ' at the confirmed unit costs' : ' at the weighted-average store cost'}. Stock leaves the store when you post.</div>`;
       };
       form.addEventListener('input', e => { e.target.classList?.remove('invalid'); recalc(); }); form.addEventListener('change', e => { e.target.classList?.remove('invalid'); recalc(); }); recalc();
-      el.addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (!b) return; if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('select').focus(); } if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelector('select').value = ''; tr.querySelectorAll('input').forEach(i => i.value = ''); } } recalc(); });
+      el.addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (!b) return; if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('.ipick-q').focus(); } if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelectorAll('input').forEach(i => i.value = ''); } } recalc(); });
       const doSubmit = () => {
         const btn = $('[data-submit]', el); if (btn.disabled) return; btn.disabled = true;
         try {
@@ -3498,9 +3541,8 @@ ACT.newGRN = () => {
     { k: 'grnNo', label: 'GRN #', req: true, span: 4, hint: 'Goods receipt note number — must be unique' }, { k: 'lpoNo', label: 'LPO #', span: 4, hint: 'Your purchase order to the supplier' }, { k: 'ref', label: 'Supplier invoice / delivery note', span: 4 },
     { k: 'comments', label: 'Comments', type: 'textarea', span: 12, rows: 2 },
   ];
-  const itemOpts = v => `<option value="">— Select store item —</option>` + items.map(i => `<option value="${i.id}" ${i.id === v ? 'selected' : ''}>${esc(i.sku)} · ${esc(i.name)}</option>`).join('');
   const rowHTML = () => `<tr class="pi-row">
-    <td><select name="itemId">${itemOpts('')}</select><div class="small faint pi-onhand" style="margin-top:3px"></div></td>
+    <td>${itemPickerHTML()}<div class="small faint pi-onhand" style="margin-top:3px"></div></td>
     <td><input type="number" name="qty" step="any" min="0" inputmode="decimal" placeholder="0"></td>
     <td class="pi-uom muted">—</td>
     <td><input type="number" name="unitCost" step="any" min="0" inputmode="decimal" placeholder="0.00"></td>
@@ -3536,8 +3578,8 @@ ACT.newGRN = () => {
       form.addEventListener('input', e => { e.target.classList?.remove('invalid'); recalc(); }); form.addEventListener('change', e => { e.target.classList?.remove('invalid'); recalc(); }); recalc();
       el.addEventListener('click', e => {
         const b = e.target.closest('[data-pi]'); if (!b) return;
-        if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('select').focus(); }
-        if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelector('select').value = ''; tr.querySelectorAll('input').forEach(i => i.value = ''); } }
+        if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('.ipick-q').focus(); }
+        if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelectorAll('input').forEach(i => i.value = ''); } }
         recalc();
       });
       const doSubmit = () => {
@@ -3638,8 +3680,7 @@ ACT.stMove = () => {
     { k: 'receiptDate', label: 'Transfer date', type: 'date', req: true, span: 4 },
     { k: 'ref', label: 'Transfer reference', req: true, span: 4, hint: 'Unique' }, { k: 'comments', label: 'Comments', type: 'textarea', span: 8, rows: 2 },
   ];
-  const itemOpts = () => `<option value="">— Select store item —</option>` + items.map(i => `<option value="${i.id}">${esc(i.sku)} · ${esc(i.name)}</option>`).join('');
-  const rowHTML = () => `<tr class="pi-row"><td><select name="itemId">${itemOpts()}</select><div class="small faint pi-onhand" style="margin-top:3px"></div></td><td><input type="number" name="qty" step="any" min="0" inputmode="decimal" placeholder="0"></td><td class="pi-uom muted">—</td><td class="r pi-cost mono small muted">—</td><td class="r pi-total mono">0.00</td><td class="r pi-after mono small muted">—</td><td class="row-actions"><button type="button" class="icon-btn danger" data-pi="del" aria-label="Remove item">${ic('trash', 'sm')}</button></td></tr>`;
+  const rowHTML = () => `<tr class="pi-row"><td>${itemPickerHTML()}<div class="small faint pi-onhand" style="margin-top:3px"></div></td><td><input type="number" name="qty" step="any" min="0" inputmode="decimal" placeholder="0"></td><td class="pi-uom muted">—</td><td class="r pi-cost mono small muted">—</td><td class="r pi-total mono">0.00</td><td class="r pi-after mono small muted">—</td><td class="row-actions"><button type="button" class="icon-btn danger" data-pi="del" aria-label="Remove item">${ic('trash', 'sm')}</button></td></tr>`;
   const sugg = `STK-${todayISO().slice(0, 4)}-${String(APP.db.stockReceipts.filter(r => r.kind === 'move').length + 1).padStart(4, '0')}`;
   const body = `<form novalidate>${formGrid(head, { fromStore: S[0], toStore: S[1] || S[0], receiptDate: todayISO(), ref: sugg })}
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)"><h3 style="margin:0 0 8px">Items to transfer</h3>
@@ -3666,7 +3707,7 @@ ACT.stMove = () => {
         $('#piPrev', el).innerHTML = `${ic('info', 'sm')}<div>${from === to ? '<b>Choose two different stores.</b> ' : ''}${n || 'No'} item${n === 1 ? '' : 's'} · <b>${esc(from)}</b> → <b>${esc(to)}</b>${can('fld_storeCost') ? ` · value ${cur} ${fmtN(g)}` : ''}. Stock moves at the issuing store's average cost; the receiving store's average is re-weighted.</div>`;
       };
       form.addEventListener('input', e => { e.target.classList?.remove('invalid'); recalc(); }); form.addEventListener('change', e => { e.target.classList?.remove('invalid'); recalc(); }); recalc();
-      el.addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (!b) return; if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('select').focus(); } if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelector('select').value = ''; tr.querySelector('input').value = ''; } } recalc(); });
+      el.addEventListener('click', e => { const b = e.target.closest('[data-pi]'); if (!b) return; if (b.dataset.pi === 'add') { rowsEl.insertAdjacentHTML('beforeend', rowHTML()); rowsEl.lastElementChild.querySelector('.ipick-q').focus(); } if (b.dataset.pi === 'del') { if ($$('tr.pi-row', rowsEl).length > 1) b.closest('tr').remove(); else { const tr = b.closest('tr'); tr.querySelectorAll('input').forEach(i => i.value = ''); } } recalc(); });
       const doSubmit = () => {
         const btn = $('[data-submit]', el); if (btn.disabled) return; btn.disabled = true;
         try {
