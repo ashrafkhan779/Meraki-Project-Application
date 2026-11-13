@@ -2428,7 +2428,7 @@ function attentionTable(F, t) {
 CHG.ovf = el => { vs('ov', {})[el.dataset.k] = el.value; rerender(); };
 CHG.ovp = el => { const f = VS.ov; const k = el.dataset.k; f[k] = el.value; if (k === 'year') { f.q = ''; f.m = ''; } if (k === 'q' && f.m && !periodMonths(f).map(absToKey).includes(f.m)) f.m = ''; rerender(); };
 ACT.ovType = el => { const v = el.dataset.v; const f = VS.ov; if (!v) f.types = []; else { const i = f.types.indexOf(v); if (i >= 0) f.types.splice(i, 1); else f.types.push(v); if (f.types.length === JOB_TYPES.length) f.types = []; } rerender(); };
-ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', types: [], cust: '', ecl: '', status: '', ttype: VS.ov?.ttype || 'inhouse' }; rerender(); };
+ACT.ovReset = () => { VS.ov = { year: '', q: '', m: '', types: [], cust: '', ecl: '', status: '', ttype: VS.ov?.ttype || 'inhouse', ttm: '' }; rerender(); };
 ACT.ovTT = el => { VS.ov.ttype = el.dataset.v; rerender(); };
 
 /* =====================================================================
@@ -2437,7 +2437,11 @@ ACT.ovTT = el => { VS.ov.ttype = el.dataset.v; rerender(); };
 const ACTIVE_ST_ = () => activeStatuses();
 function matrixSection(jobs, f, P, fin, jl) {
   const t = todayISO();
-  const win = P.from ? { from: P.from, to: P.to, label: P.label } : { from: t.slice(0, 8) + '01', to: lastDay(t.slice(0, 7)), label: monthLabel(t.slice(0, 7)) + ' (current month)' };
+  /* the matrix has its own month selector; empty = follow the page period (or the current month when no period is set) */
+  const ttm = /^\d{4}-\d{2}$/.test(f.ttm || '') ? f.ttm : '';
+  const win = ttm ? { from: ttm + '-01', to: lastDay(ttm), label: monthLabel(ttm) } : P.from ? { from: P.from, to: P.to, label: P.label } : { from: t.slice(0, 8) + '01', to: lastDay(t.slice(0, 7)), label: monthLabel(t.slice(0, 7)) + ' (current month)' };
+  if (ttm) jobs = scopedJobs({ ...f, from: '', to: '' }); // a chosen month looks at every job with hours in it, not only jobs opened in the page period
+  const ttMonths = (() => { const out = []; const [y0, m0] = t.slice(0, 7).split('-').map(Number); for (let k = -18; k <= 6; k++) { const a = y0 * 12 + (m0 - 1) + k; out.push(`${Math.floor(a / 12)}-${String(a % 12 + 1).padStart(2, '0')}`); } if (ttm && !out.includes(ttm)) out.unshift(ttm); return out; })();
   /* --- job title matrix --- */
   const hpd = APP.db.settings.hoursPerDay || 8; let wdays = 0; for (let d = win.from; d <= win.to && wdays < 400; d = addDays(d, 1)) if (isWorkDay(d)) wdays++;
   const CATS = ['Management', 'Engineer', 'Worker', 'Uncategorised'];
@@ -2551,7 +2555,7 @@ function matrixSection(jobs, f, P, fin, jl) {
       }) : emptyMini('No jobs in scope')}</div></section>
     <section class="card c6"><div class="card-h"><h2>Project engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('projectEngineerId'), 'pe', 'Project engineer matrix')}</div></section>
     <section class="card c6"><div class="card-h"><h2>Service engineers <span class="sub">· jobs in scope</span></h2></div><div class="card-b" style="padding:8px 0 0">${engTable(engRows('serviceEngineerId'), 'se', 'Service engineer matrix')}</div></section>
-    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <section class="card c12"><div class="card-h"><h2>Hours by job title <span class="sub">· ${esc(win.label)}</span></h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select aria-label="Month for this matrix" data-chg="ovf" data-k="ttm" style="width:auto;min-width:190px;height:32px" title="Month shown in this matrix — independent of the page period">${opt(ttMonths.map(m => [m, monthLabel(m) + (m === t.slice(0, 7) ? ' · current' : '')]), ttm, P.from ? 'Page period · ' + P.label : 'Current month (page period)')}</select><div class="seg" role="group" aria-label="Employee type">${[['inhouse', 'In-house'], ['outsourced', 'Outsourced'], ['all', 'All']].map(([v, l]) => `<button aria-pressed="${TT === v}" data-act="ovTT" data-v="${v}">${l}</button>`).join('')}</div></div></div>
       <div class="card-b" style="padding:8px 0 0">${trows.length ? titleTable() : emptyMini('No employees yet')}
       <p class="small muted" style="padding:8px 16px 12px;margin:0">${TT === 'outsourced' ? `Outsourced capacity = days actually used in this window (or the planned days when nothing is booked yet) × hours/day × availability. Headcount is summed from the job manpower lines (actual; “p” = planned only).` : TT === 'inhouse' ? `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability.` : `In-house capacity = active people × ${wdays} working days × ${hpd} h × availability; outsourced capacity = days actually used (or planned) × hours/day.`} Planned/actual hours are manpower lines dated in this window on jobs in scope. % used = actual ÷ capacity (green at 80 % or more, red below); Difference = capacity − actual. ${TT === 'outsourced' ? 'Click a job title to list the outsourcing companies supplying it, a company for its job numbers, and a job for the people on it.' : 'Click a category to list its job titles, a title for its job numbers, and a job for the people on it.'} Jobs = distinct jobs with manpower lines in this window. A person listed under a job shows that job's hours against their capacity for the whole window; people with no job line are listed under their title with their full capacity.</p></div></section>
   </div>`;
@@ -2784,11 +2788,11 @@ VIEWS.job = (root, r) => {
 /* ---------------- shared cost UI ---------------- */
 const lineEditable = (job, t) => can(COST_PERM[t]) && canType(job.type) && (!job.locked || can('editClosedJobs')) && !job.archived;
 const reasonField = job => job.locked ? [{ k: 'reason', label: 'Reason for changing a closed job', type: 'textarea', rows: 2, span: 12, req: true }] : [];
-function costCard(title, sub, t, job, cols, rows, addLabel, foot) {
+function costCard(title, sub, t, job, cols, rows, addLabel, foot, tools = '', filtered = false) {
   const ed = lineEditable(job, t);
   const c = [...cols, ...(ed ? [{ k: '_a', label: '', nosort: 1, cls: 'row-actions', fmt: l => l.assignmentId && t === 'plannedManpower' ? `<a class="btn ghost sm" href="#/roster?emp=${l.employeeId}" title="Linked to roster assignment">${ic('calendar', 'sm')}Roster</a>` : `<button class="icon-btn" data-act="editLine" data-t="${t}" data-id="${l.id}" aria-label="Edit line">${ic('edit', 'sm')}</button><button class="icon-btn danger" data-act="delLine" data-t="${t}" data-id="${l.id}" aria-label="Delete line">${ic('trash', 'sm')}</button>` }] : [])];
-  return `<section class="card" style="margin-bottom:14px"><div class="card-h"><h2>${esc(title)} <span class="sub">· ${esc(sub)}</span></h2>${ed ? `<button class="btn sm primary" data-act="addLine" data-t="${t}" data-job="${job.id}">${ic('plus', 'sm')}${esc(addLabel)}</button>` : ''}</div>
-    <div class="card-b" style="padding:10px 0 0">${rows.length ? tableHTML({ caption: title, cols: c, rows, sticky: false, foot }) : `<div class="empty" style="padding:22px">${ic('clipboard')}<b>No ${esc(title.toLowerCase())} yet</b>${ed ? 'Use “' + esc(addLabel) + '” to add the first line.' : ''}</div>`}</div></section>`;
+  return `<section class="card" style="margin-bottom:14px"><div class="card-h"><h2>${esc(title)} <span class="sub">· ${esc(sub)}</span></h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${tools}${ed ? `<button class="btn sm primary" data-act="addLine" data-t="${t}" data-job="${job.id}">${ic('plus', 'sm')}${esc(addLabel)}</button>` : ''}</div></div>
+    <div class="card-b" style="padding:10px 0 0">${rows.length ? tableHTML({ caption: title, cols: c, rows, sticky: false, foot }) : filtered ? `<div class="empty" style="padding:22px">${ic('search')}<b>No lines match the search</b>Clear the search box to see all ${esc(title.toLowerCase())}.</div>` : `<div class="empty" style="padding:22px">${ic('clipboard')}<b>No ${esc(title.toLowerCase())} yet</b>${ed ? 'Use “' + esc(addLabel) + '” to add the first line.' : ''}</div>`}</div></section>`;
 }
 function sumStrip(items) { return `<div class="cost-sum">${items.map(([l, v, s]) => `<div><div class="fl">${l}</div><div class="fv">${v}</div><div class="fs">${s || ''}</div></div>`).join('')}</div>`; }
 const rateCell = l => can('viewCostRates') ? fmtN(l.rate) : '<span class="faint" title="Requires “View employee cost rates”">•••</span>';
@@ -2819,7 +2823,12 @@ function tabManpower(root, job, x) {
 }
 const compactF = v => can('viewFinancials') ? compact(v) : '•••';
 function tabMaterials(root, job, x) {
-  const P = L(job.id, 'plannedMaterials'), A = L(job.id, 'actualMaterials'), TR = L(job.id, 'inventoryTransfers');
+  const P = L(job.id, 'plannedMaterials'), A0 = L(job.id, 'actualMaterials'), TR0 = L(job.id, 'inventoryTransfers');
+  const ms = vs('mat_' + job.id, { q: '', tq: '' }); const terms = v => (v || '').toLowerCase().split(/\s+/).filter(Boolean); const hit = (hay, ts) => ts.every(t => hay.includes(t));
+  const aq = terms(ms.q), tqs = terms(ms.tq);
+  const A = aq.length ? A0.filter(l => hit(`${l.description} ${l.category || ''} ${nameOf('suppliers', l.supplierId)} ${l.poNo || ''} ${l.supplierRef || ''} ${l.uom || ''} ${l.comments || ''} ${fmtDate(l.purchaseDate)}`.toLowerCase(), aq)) : A0;
+  const TR = tqs.length ? TR0.filter(tr => { const it = get('inventoryItems', tr.itemId); return hit(`${it?.name || ''} ${it?.sku || ''} ${it?.group || ''} ${it?.subGroup || ''} ${tr.ref} ${tr.batchRef || ''} ${tr.store || ''} ${tr.issuedBy || ''} ${tr.receivedBy || ''} ${tr.status} ${fmtDate(tr.transferDate)}`.toLowerCase(), tqs); }) : TR0;
+  const searchBox = (k, v, ph, n, n0) => `<label class="search" style="margin:0"><span class="sr">${esc(ph)}</span>${ic('search', 'sm')}<input type="search" placeholder="${esc(ph)}" value="${esc(v)}" data-chg="matq" data-job="${job.id}" data-k="${k}" data-focus-key="mat_${k}" style="min-width:230px"></label>${v ? `<span class="small muted nowrap">${n} of ${n0}</span>` : ''}`;
   const mcols = (dk, dl) => [
     { k: 'description', label: 'Material', fmt: l => `<b style="font-weight:600">${esc(l.description)}</b><div class="small faint">${esc(l.category || '')}</div>` },
     { k: 'supplierId', label: 'Vendor', fmt: l => esc(nameOf('suppliers', l.supplierId) || '—') },
@@ -2845,10 +2854,11 @@ function tabMaterials(root, job, x) {
     ['Internal store transfers', money(x.actualMaterialTransfer), `${TR.filter(t => t.status === 'Posted').length} posted · costed, not free`],
     ['Material variance', x.actualMaterial ? varHTML(r2(x.actualMaterial - x.plannedMaterial)) : '<span class="faint">—</span>', `Total actual ${compactF(x.actualMaterial)}`],
   ]) + costCard('Planned materials', 'quantity × planned unit price', 'plannedMaterials', job, mcols('expectedDate', 'Expected purchase'), P, 'Add planned material')
-    + costCard('Actual purchased materials', 'external supplier purchases', 'actualMaterials', job, mcols('purchaseDate', 'Purchase date · ref.'), A, 'Add purchase')
-    + `<section class="card" style="margin-bottom:14px"><div class="card-h"><h2>Internal store transfers <span class="sub">· issued from company store to this job</span></h2>${ed ? `<button class="btn sm primary" data-act="addTransfer" data-job="${job.id}">${ic('truck', 'sm')}Post transfer</button>` : ''}</div>
-      <div class="card-b" style="padding:10px 0 0">${TR.length ? tableHTML({ caption: 'Store transfers', cols: trCols, rows: TR, sticky: false }) : `<div class="empty" style="padding:22px">${ic('package')}<b>No store transfers</b>Transfers are costed at weighted-average store cost (or a confirmed manual cost) and cannot be posted twice.</div>`}</div></section>`;
+    + costCard('Actual purchased materials', 'external supplier purchases', 'actualMaterials', job, mcols('purchaseDate', 'Purchase date · ref.'), A, 'Add purchase', undefined, A0.length ? searchBox('q', ms.q, 'Search material, vendor, PO #, reference', A.length, A0.length) : '', !!aq.length)
+    + `<section class="card" style="margin-bottom:14px"><div class="card-h"><h2>Internal store transfers <span class="sub">· issued from company store to this job</span></h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${TR0.length ? searchBox('tq', ms.tq, 'Search item, SKU, transfer ref., store', TR.length, TR0.length) : ''}${ed ? `<button class="btn sm primary" data-act="addTransfer" data-job="${job.id}">${ic('truck', 'sm')}Post transfer</button>` : ''}</div></div>
+      <div class="card-b" style="padding:10px 0 0">${TR.length ? tableHTML({ caption: 'Store transfers', cols: trCols, rows: TR, sticky: false }) : tqs.length ? `<div class="empty" style="padding:22px">${ic('search')}<b>No transfers match the search</b>Clear the search box to see all store transfers.</div>` : `<div class="empty" style="padding:22px">${ic('package')}<b>No store transfers</b>Transfers are costed at weighted-average store cost (or a confirmed manual cost) and cannot be posted twice.</div>`}</div></section>`;
 }
+CHG.matq = el => { const ms = vs('mat_' + el.dataset.job, { q: '', tq: '' }); ms[el.dataset.k] = el.value; rerender(); };
 function tabMisc(root, job, x) {
   const P = L(job.id, 'plannedMisc'), A = L(job.id, 'actualMisc');
   const base = [
