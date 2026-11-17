@@ -583,7 +583,7 @@ const PERMS = [
   ['master_inhouse', 'Master · Employees · in-house', 'Master data tabs'], ['master_outsourced', 'Master · Employees · outsourced', 'Master data tabs'],
   ['report_register', 'Report · Job register', 'Reports'], ['report_status', 'Report · Job status', 'Reports'], ['report_pva', 'Report · Planned vs actual cost', 'Reports'], ['report_gp', 'Report · Job-wise GP', 'Reports'],
   ['report_customer', 'Report · Customer-wise profitability', 'Reports'], ['report_endclient', 'Report · End-client-wise profitability', 'Reports'], ['report_supplier', 'Report · Supplier-wise cost', 'Reports'],
-  ['report_manpower', 'Report · Manpower utilisation', 'Reports'], ['report_allocation', 'Report · Employee allocation', 'Reports'], ['report_materials', 'Report · Material cost', 'Reports'], ['report_misc', 'Report · Miscellaneous expenses', 'Reports'],
+  ['report_manpower', 'Report · Manpower utilisation', 'Reports'], ['report_jobmanpower', 'Report · Job-wise manpower utilisation', 'Reports'], ['report_allocation', 'Report · Employee allocation', 'Reports'], ['report_materials', 'Report · Material cost', 'Reports'], ['report_misc', 'Report · Miscellaneous expenses', 'Reports'],
   ['report_receivables', 'Report · Invoice & receivables', 'Reports'], ['report_closed', 'Report · Closed jobs', 'Reports'], ['report_monthly', 'Report · Monthly financial summary', 'Reports'],
   ['set_general', 'Settings · Company & finance', 'Settings tabs'], ['set_numbering', 'Settings · Job numbering', 'Settings tabs'], ['set_lists', 'Settings · Statuses & categories', 'Settings tabs'], ['set_calendar', 'Settings · Working calendar', 'Settings tabs'],
   ['set_prefs', 'Settings · Notifications, files & export', 'Settings tabs'], ['set_users', 'Settings · Users', 'Settings tabs'], ['set_roles', 'Settings · Roles & permissions', 'Settings tabs'], ['set_audit', 'Settings · Audit log', 'Settings tabs'],
@@ -3820,6 +3820,18 @@ const REPORTS = [
     }, total: true,
   },
   {
+    id: 'jobmanpower', name: 'Job-wise manpower utilisation', desc: 'Actual manpower hours and cost per job, split in-house / outsourced, against the planned hours. Dates filter the work dates of the manpower lines; jobs without manpower lines in the range are not listed.', filters: ['date', 'type', 'cust', 'ecl', 'status'], dateNote: 'Work date', fin: true,
+    cols: [['jobNo', 'Job no.'], ['zohoSo', 'Zoho SO #'], ['customer', 'Company'], ['status', 'Status'], ['inHours', 'In-house actual h', 'num'], ['inCost', 'In-house actual cost', 'money'], ['outHours', 'Outsourced actual h', 'num'], ['outCost', 'Outsourced actual cost', 'money'], ['totHours', 'Total actual h', 'num'], ['totCost', 'Total actual cost', 'money'], ['planHours', 'Planned h', 'num'], ['utilPct', 'Actual % of planned', 'pct']],
+    rows: f => repJobs({ type: f.type, cust: f.cust, ecl: f.ecl, status: f.status }).map(j => {
+      const act = L(j.id, 'actualManpower').filter(l => inRange(l.dateFrom, f)); const plan = L(j.id, 'plannedManpower').filter(l => inRange(l.startDate || j.openingDate, f));
+      const isOut = l => l.resourceType === 'outsourced' || get('employees', l.employeeId)?.type === 'outsourced';
+      const A_in = act.filter(l => !isOut(l)), A_out = act.filter(isOut);
+      const r = { _id: j.id, jobNo: j.jobNo, zohoSo: j.zohoSo || '', customer: nameOf('customers', j.customerId), status: j.status, _n: act.length + plan.length,
+        inHours: r2(sum(A_in, Calc.mpHours)), inCost: r2(sum(A_in, Calc.mp)), outHours: r2(sum(A_out, Calc.mpHours)), outCost: r2(sum(A_out, Calc.mp)), planHours: r2(sum(plan, Calc.mpHours)) };
+      r.totHours = r2(r.inHours + r.outHours); r.totCost = r2(r.inCost + r.outCost); r.utilPct = r.planHours > 0 ? r.totHours / r.planHours * 100 : null; return r;
+    }).filter(r => r._n > 0).sort((a, b) => b.totCost - a.totCost || b.totHours - a.totHours), total: true,
+  },
+  {
     id: 'allocation', name: 'Employee allocation', desc: 'All roster assignments overlapping the period.', filters: ['date', 'type', 'emp'],
     cols: [['employee', 'Employee'], ['etype', 'Type'], ['jobNo', 'Job no.'], ['project', 'Project'], ['startDate', 'Start', 'date'], ['endDate', 'End', 'date'], ['allocationPct', 'Alloc. %', 'int'], ['plannedHours', 'Planned h', 'num'], ['actualHours', 'Actual h', 'num'], ['status', 'Status']],
     rows: f => APP.db.assignments.filter(a => !a.archived && (!f.emp || a.employeeId === f.emp) && (!f.from || a.endDate >= f.from) && (!f.to || a.startDate <= f.to)).map(a => { const j = get('jobs', a.jobId), e = get('employees', a.employeeId); return { ...a, _id: a.jobId, employee: e?.name, etype: e?.type === 'outsourced' ? 'Outsourced' : 'In-house', jobNo: j?.jobNo, project: j?.description, _type: j?.type }; }).filter(r => canType(r._type) && (!f.type || r._type === f.type)).sort(by('startDate', -1)),
@@ -3862,7 +3874,7 @@ function repRaw(c, v) { if (v == null || v === '') return ''; if (c.t === 'money
 function repData(R, f) {
   const rows = R.rows(f); const cols = repCols(R);
   const totals = R.total ? cols.map((c, i) => i === 0 ? 'Total' : ['money', 'num', 'int'].includes(c.t) && !/Pct|pct|Util/.test(c.k) && c.k !== 'completionPct' ? r2(sum(rows, r => num(r[c.k]))) : '') : null;
-  if (totals) cols.forEach((c, i) => { if (c.t === 'pct') { const gp = { plannedGPPct: ['plannedGP', 'plannedPO'], actualGPPct: ['actualGP', 'actualPO'], gpPct: ['actualGP', 'actualPO'], plannedUtil: ['planned', 'capacity'], actualUtil: ['actual', 'capacity'] }[c.k]; if (gp) { const a = sum(rows, r => num(r[gp[0]])), b = sum(rows, r => num(r[gp[1]])); totals[i] = b > 0 ? a / b * 100 : null; } } });
+  if (totals) cols.forEach((c, i) => { if (c.t === 'pct') { const gp = { plannedGPPct: ['plannedGP', 'plannedPO'], actualGPPct: ['actualGP', 'actualPO'], gpPct: ['actualGP', 'actualPO'], plannedUtil: ['planned', 'capacity'], actualUtil: ['actual', 'capacity'], utilPct: ['totHours', 'planHours'] }[c.k]; if (gp) { const a = sum(rows, r => num(r[gp[0]])), b = sum(rows, r => num(r[gp[1]])); totals[i] = b > 0 ? a / b * 100 : null; } } });
   return { rows, cols, totals };
 }
 VIEWS.reports = (root, r) => {
