@@ -3821,12 +3821,12 @@ const REPORTS = [
   },
   {
     id: 'jobmanpower', name: 'Job-wise manpower utilisation', desc: 'Actual manpower hours and cost per job, split in-house / outsourced, against the planned hours. Dates filter the work dates of the manpower lines; jobs without manpower lines in the range are not listed.', filters: ['date', 'type', 'cust', 'ecl', 'status'], dateNote: 'Work date', fin: true,
-    cols: [['jobNo', 'Job no.'], ['zohoSo', 'Zoho SO #'], ['customer', 'Company'], ['status', 'Status'], ['inHours', 'In-house actual h', 'num'], ['inCost', 'In-house actual cost', 'money'], ['outHours', 'Outsourced actual h', 'num'], ['outCost', 'Outsourced actual cost', 'money'], ['totHours', 'Total actual h', 'num'], ['totCost', 'Total actual cost', 'money'], ['planHours', 'Planned h', 'num'], ['utilPct', 'Actual % of planned', 'pct']],
+    cols: [['jobNo', 'Job no.'], ['zohoSo', 'Zoho SO #'], ['customer', 'Company'], ['endClient', 'End-client'], ['status', 'Status'], ['inHours', 'In-house actual h', 'num'], ['inCost', 'In-house actual cost', 'money'], ['outHours', 'Outsourced actual h', 'num'], ['outCost', 'Outsourced actual cost', 'money'], ['totHours', 'Total actual h', 'num'], ['totCost', 'Total actual cost', 'money'], ['planHours', 'Planned h', 'num'], ['utilPct', 'Actual % of planned', 'pct']],
     rows: f => repJobs({ type: f.type, cust: f.cust, ecl: f.ecl, status: f.status }).map(j => {
       const act = L(j.id, 'actualManpower').filter(l => inRange(l.dateFrom, f)); const plan = L(j.id, 'plannedManpower').filter(l => inRange(l.startDate || j.openingDate, f));
       const isOut = l => l.resourceType === 'outsourced' || get('employees', l.employeeId)?.type === 'outsourced';
       const A_in = act.filter(l => !isOut(l)), A_out = act.filter(isOut);
-      const r = { _id: j.id, jobNo: j.jobNo, zohoSo: j.zohoSo || '', customer: nameOf('customers', j.customerId), status: j.status, _n: act.length + plan.length,
+      const r = { _id: j.id, jobNo: j.jobNo, zohoSo: j.zohoSo || '', customer: nameOf('customers', j.customerId), endClient: nameOf('endClients', j.endClientId), status: j.status, _n: act.length + plan.length,
         inHours: r2(sum(A_in, Calc.mpHours)), inCost: r2(sum(A_in, Calc.mp)), outHours: r2(sum(A_out, Calc.mpHours)), outCost: r2(sum(A_out, Calc.mp)), planHours: r2(sum(plan, Calc.mpHours)) };
       r.totHours = r2(r.inHours + r.outHours); r.totCost = r2(r.inCost + r.outCost); r.utilPct = r.planHours > 0 ? r.totHours / r.planHours * 100 : null; return r;
     }).filter(r => r._n > 0).sort((a, b) => b.totCost - a.totCost || b.totHours - a.totHours), total: true,
