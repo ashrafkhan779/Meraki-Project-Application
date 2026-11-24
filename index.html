@@ -391,6 +391,20 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .tt-comp td{background:#FAFBFE}.tt-comp td:first-child b{color:var(--accent)}
 .tt-job td{background:#fff}
 
+/* Job Status kanban */
+.kanban{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 10px;align-items:flex-start}
+.kcol{flex:0 0 290px;max-width:290px;background:var(--neutral-bg);border-radius:var(--r);display:flex;flex-direction:column;max-height:calc(100vh - 330px);min-height:140px;border:1px solid transparent;transition:border-color var(--t),background var(--t)}
+.kcol.over{border-color:var(--accent);background:#E9F0FF}.kcol.nodrop.over{border-color:var(--danger);background:#FDECEC}
+.kcol-h{padding:10px 12px 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:0;background:inherit;border-radius:var(--r) var(--r) 0 0;z-index:1}
+.kcol-h .n{margin-left:auto;font-family:var(--f-num);font-weight:700;font-size:13px}.kcol-h .po{flex-basis:100%;font-size:12px;color:var(--muted)}.kcol-h .po b{font-family:var(--f-num);color:var(--text)}
+.kcards{overflow:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:8px;min-height:40px}
+.kcard{background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;padding:10px 11px;box-shadow:0 1px 2px rgba(15,23,42,.05);font-size:12.5px;line-height:1.35}
+.kcard[draggable=true]{cursor:grab}.kcard.dragging{opacity:.45}.kcard:focus-visible{outline:2px solid var(--accent)}
+.kcard .kt{display:flex;align-items:center;gap:6px;margin-bottom:4px}.kcard .kt .jobno{font-weight:700}.kcard .kd{color:var(--text);margin:2px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kcard .km{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:var(--muted)}.kcard .km b{color:var(--text);font-weight:600}
+.kcard .kbar{height:4px;background:var(--rule);border-radius:3px;margin-top:8px;overflow:hidden}.kcard .kbar i{display:block;height:100%;background:var(--accent)}
+.kempty{padding:18px 10px;text-align:center;color:var(--faint);font-size:12px;border:1px dashed var(--border);border-radius:8px;margin:0 8px 8px}
+@media print{.kanban{flex-wrap:wrap}.kcol{max-height:none}}
 /* multi-item purchase form */
 .pi-table td{padding:6px 6px;vertical-align:middle}.pi-table th{white-space:nowrap}.pi-table input,.pi-table select{width:100%;min-width:0;margin:0}.pi-table input.invalid,.pi-table select.invalid{border-color:var(--danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger) 25%,transparent)}.pi-table .pi-total{font-family:var(--f-num)}
 .pi-table tfoot td{border-top:1px solid var(--rule);padding-top:10px}
@@ -564,7 +578,7 @@ const TYPE_SLUG = { 'Service': 'service', 'Supply': 'supply', 'Supply/Services':
 const SLUG_TYPE = { service: 'Service', supply: 'Supply', 'supply-services': 'Supply/Services', all: null };
 const INVOICE_STATUSES = ['Uninvoiced', 'Unpaid', 'Partially Paid', 'Paid'];
 const PERMS = [
-  ['viewOverview', 'View Overview tab', 'Tabs'], ['viewJobs', 'View Jobs tab', 'Tabs'], ['viewRoster', 'View Roster tab', 'Tabs'],
+  ['viewOverview', 'View Overview tab', 'Tabs'], ['viewJobs', 'View Jobs tab', 'Tabs'], ['viewStatus', 'View Job Status (Kanban) tab', 'Tabs'], ['viewRoster', 'View Roster tab', 'Tabs'],
   ['viewMaster', 'View Master Data tab', 'Tabs'], ['viewStores', 'View Stores tab', 'Tabs'], ['viewReports', 'View Reports tab', 'Tabs'], ['viewSettings', 'View Settings tab', 'Tabs'],
   ['jobCreate', 'Create jobs', 'Jobs'], ['quickAddMaster', 'Quick-add companies, end-clients & engineers from the job form', 'Jobs'], ['jobEdit', 'Edit jobs', 'Jobs'], ['jobDelete', 'Archive (delete) jobs', 'Jobs'],
   ['viewFinancials', 'View financial data', 'Finance'], ['editFinancials', 'Edit financial data (PO values)', 'Finance'],
@@ -598,7 +612,7 @@ const PERMS = [
   ['fld_storeCost', 'Field · Store item unit cost & stock value (opening cost, weighted average, receipt cost)', 'Fields'], ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
 ];
 /* A fine-grained permission a role has never set (older roles, or a role saved before the option existed) inherits its parent. */
-const PERM_PARENT = p => p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p === 'deact_items' ? 'manageStores' : p === 'deact_suppliers' ? ['manageMaster', 'manageStores'] : p.startsWith('deact_') ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
+const PERM_PARENT = p => p === 'viewStatus' ? 'viewJobs' : p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p === 'deact_items' ? 'manageStores' : p === 'deact_suppliers' ? ['manageMaster', 'manageStores'] : p.startsWith('deact_') ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
   : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_storeCost' ? ['viewFinancials', 'manageMaster', 'manageStores'] : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
 /* money-type fields are only visible with View financial data, whatever the field switch says */
 const PERM_REQUIRES = { fld_poValue: 'viewFinancials', fld_costs: 'viewFinancials', fld_margin: 'viewFinancials', fld_invoicing: 'viewFinancials', set_users: 'manageUsers' };
@@ -1397,7 +1411,7 @@ const go = (hash) => { if (location.hash === hash) render(); else location.hash 
 const qs = o => { const p = new URLSearchParams(); Object.entries(o).forEach(([k, v]) => { if (v != null && v !== '') p.set(k, v); }); const s = p.toString(); return s ? '?' + s : ''; };
 
 const NAV = [
-  ['overview', 'Overview', 'dashboard', 'viewOverview'], ['jobs', 'Jobs', 'briefcase', 'viewJobs'], ['roster', 'Roster Planner', 'calendar', 'viewRoster'],
+  ['overview', 'Overview', 'dashboard', 'viewOverview'], ['jobs', 'Jobs', 'briefcase', 'viewJobs'], ['status', 'Job Status', 'clipboard', 'viewStatus'], ['roster', 'Roster Planner', 'calendar', 'viewRoster'],
   ['master', 'Master Data', 'database', 'viewMaster'], ['stores', 'Stores', 'package', 'viewStores'], ['reports', 'Reports', 'chart-bar', 'viewReports'], ['settings', 'Settings', 'settings', 'viewSettings'],
 ];
 const VIEWS = {};
@@ -3876,6 +3890,70 @@ function repData(R, f) {
   const totals = R.total ? cols.map((c, i) => i === 0 ? 'Total' : ['money', 'num', 'int'].includes(c.t) && !/Pct|pct|Util/.test(c.k) && c.k !== 'completionPct' ? r2(sum(rows, r => num(r[c.k]))) : '') : null;
   if (totals) cols.forEach((c, i) => { if (c.t === 'pct') { const gp = { plannedGPPct: ['plannedGP', 'plannedPO'], actualGPPct: ['actualGP', 'actualPO'], gpPct: ['actualGP', 'actualPO'], plannedUtil: ['planned', 'capacity'], actualUtil: ['actual', 'capacity'], utilPct: ['totHours', 'planHours'] }[c.k]; if (gp) { const a = sum(rows, r => num(r[gp[0]])), b = sum(rows, r => num(r[gp[1]])); totals[i] = b > 0 ? a / b * 100 : null; } } });
   return { rows, cols, totals };
+}
+/* =============== Job Status — Kanban board by status =============== */
+VIEWS.status = (root, r) => {
+  setCrumbs([['Job Status', '#/status']]);
+  const s = vs('kb', { type: '', cust: '', ecl: '', year: '', q: '' }); const fin = can('viewFinancials') && can('fld_poValue'); const F = k => can('fld_' + k);
+  const q = s.q.trim().toLowerCase();
+  const jobs = APP.db.jobs.filter(j => !j.archived && canType(j.type) && (!s.type || j.type === s.type) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl) && (!s.year || (j.openingDate || '').startsWith(s.year)) && (!q || jobSearchText(j).includes(q)));
+  const ST = allStatuses(); const byS = Object.fromEntries(ST.map(st => [st, []])); const other = [];
+  for (const j of jobs) (byS[j.status] ? byS[j.status] : other).push(j);
+  if (other.length) { byS['Other'] = other; ST.push('Other'); }
+  const X = j => Calc.job(j); const po = list => r2(sum(list.filter(j => j.status !== 'Cancelled'), j => X(j).actualPO));
+  const years = [...new Set(APP.db.jobs.filter(j => !j.archived).map(j => (j.openingDate || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const canDrag = can('jobEdit');
+  const order = { ...Object.fromEntries(activeStatuses().map((x, i) => [x, i])) };
+  const live_ = jobs.filter(j => activeStatuses().includes(j.status)), done_ = jobs.filter(j => ['Completed', 'Closed'].includes(j.status));
+  const card = j => { const x = X(j); const pct = Math.max(0, Math.min(100, num(j.completionPct))); const late = j.pfDate && j.pfDate < todayISO() && !END_ST.includes(j.status);
+    return `<article class="kcard" data-id="${j.id}" ${canDrag && !j.locked && j.status !== 'Closed' ? 'draggable="true"' : ''} tabindex="0" aria-label="${esc(j.jobNo)}">
+      <div class="kt"><a class="jobno" href="#/job/${j.id}">${esc(j.jobNo)}</a><span class="badge nodot small">${esc(j.type.replace('Supply/Services', 'S/S'))}</span>${j.locked ? ic('lock', 'sm') : ''}${late ? `<span class="badge b-bad nodot small" title="Past planned finish">late</span>` : ''}</div>
+      ${F('zohoSo') && j.zohoSo ? `<div class="small faint mono">SO ${esc(j.zohoSo)}</div>` : ''}
+      <div class="kd" title="${esc(j.description)}">${esc(j.description)}</div>
+      <div class="km"><span><b>${esc(nameOf('customers', j.customerId))}</b>${F('endClient') && j.endClientId ? ` · ${esc(nameOf('endClients', j.endClientId))}` : ''}</span></div>
+      <div class="km" style="margin-top:4px">${fin ? `<span>PO <b>${compact(x.actualPO)}</b></span>` : ''}${F('dates') && j.pfDate ? `<span>PF <b>${fmtDate(j.pfDate)}</b></span>` : ''}${F('engineers') && j.projectEngineerId ? `<span>PE <b>${esc(nameOf('employees', j.projectEngineerId).split(' ')[0])}</b></span>` : ''}${F('invoicing') ? `<span>${invBadge(x.invoiceStatus)}</span>` : ''}</div>
+      ${F('completion') ? `<div class="kbar" title="${pct}% complete"><i style="width:${pct}%"></i></div>` : ''}</article>`; };
+  root.innerHTML = `
+  <div class="page-head"><div class="t"><h1>Job Status</h1><p>Kanban view of every job by project status · ${jobs.length} job${jobs.length === 1 ? '' : 's'} shown${canDrag ? ' · drag a card to another column to change its status' : ''}. Closed jobs are moved with “Close job” / “Reopen” on the job itself.</p></div>
+    <div class="actions"><button class="btn" data-act="print">${ic('print', 'sm')}Print</button>${can('jobCreate') ? `<a class="btn primary" href="#/jobs/${TYPE_SLUG[JOB_TYPES.find(canType) || 'Service']}/new">${ic('plus', 'sm')}New job</a>` : ''}</div></div>
+  ${sumStrip([
+    ['Jobs', `<b>${jobs.length}</b>`, `${live_.length} active · ${done_.length} completed / closed · ${jobs.filter(j => j.status === 'Cancelled').length} cancelled`],
+    ['PO value · all shown', fin ? money(po(jobs)) : '•••', 'excludes cancelled jobs'],
+    ['PO value · active jobs', fin ? money(po(live_)) : '•••', activeStatuses().join(', ')],
+    ['PO value · completed & closed', fin ? money(po(done_)) : '•••', `${ST.filter(st => (byS[st] || []).length).length} status column${ST.length === 1 ? '' : 's'} in use`],
+  ])}
+  <div class="filters">
+    <label class="search"><span class="sr">Search jobs</span>${ic('search', 'sm')}<input type="search" placeholder="Job no., company, SO, description" value="${esc(s.q)}" data-chg="kbf" data-k="q" data-focus-key="kbsearch"></label>
+    <select aria-label="Job type" data-chg="kbf" data-k="type">${opt(JOB_TYPES.filter(canType), s.type, 'All job types')}</select>
+    <select aria-label="Company" data-chg="kbf" data-k="cust">${opt(custOpts(s.cust), s.cust, 'All companies')}</select>
+    ${can('fld_endClient') ? `<select aria-label="End-client" data-chg="kbf" data-k="ecl">${opt(ecOpts(s.ecl), s.ecl, 'All end-clients')}</select>` : ''}
+    <select aria-label="Opened in year" data-chg="kbf" data-k="year">${opt(years, s.year, 'All years')}</select>
+    ${s.q || s.type || s.cust || s.ecl || s.year ? `<button class="btn ghost sm" data-act="kbReset">Reset</button>` : ''}
+  </div>
+  <div class="kanban" id="kanban">${ST.map(st => { const list = (byS[st] || []).slice().sort((a, b) => (a.pfDate || '9999').localeCompare(b.pfDate || '9999') || a.jobNo.localeCompare(b.jobNo)); const nodrop = st === 'Closed' || st === 'Other';
+    return `<section class="kcol ${nodrop ? 'nodrop' : ''}" data-status="${esc(st)}" aria-label="${esc(st)}"><div class="kcol-h">${st === 'Other' ? '<span class="badge">Other</span>' : statusBadge(st)}<span class="n" title="Jobs">${list.length}</span><span class="po">PO value <b>${fin ? (st === 'Cancelled' ? '—' : money(po(list), { cur: false })) : '•••'}</b></span></div>
+      <div class="kcards">${list.length ? list.map(card).join('') : `<div class="kempty">No jobs</div>`}</div></section>`; }).join('')}</div>`;
+  bindKanban();
+};
+CHG.kbf = el => { VS.kb[el.dataset.k] = el.value; rerender(); };
+ACT.kbReset = () => { VS.kb = { type: '', cust: '', ecl: '', year: '', q: '' }; rerender(); };
+let KB_BOUND = false, KB_DRAG = null;
+function bindKanban() {
+  if (KB_BOUND) return; KB_BOUND = true;
+  document.addEventListener('dragstart', e => { const c = e.target.closest?.('.kcard[draggable=true]'); if (!c) return; KB_DRAG = c.dataset.id; c.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', KB_DRAG); } catch (x) { } });
+  document.addEventListener('dragend', e => { e.target.closest?.('.kcard')?.classList.remove('dragging'); $$('.kcol.over').forEach(c => c.classList.remove('over')); KB_DRAG = null; });
+  document.addEventListener('dragover', e => { const col = e.target.closest?.('.kcol'); if (!col || !KB_DRAG) return; e.preventDefault(); e.dataTransfer.dropEffect = col.classList.contains('nodrop') ? 'none' : 'move'; $$('.kcol.over').forEach(c => c !== col && c.classList.remove('over')); col.classList.add('over'); });
+  document.addEventListener('dragleave', e => { const col = e.target.closest?.('.kcol'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+  document.addEventListener('drop', async e => {
+    const col = e.target.closest?.('.kcol'); if (!col || !KB_DRAG) return; e.preventDefault(); const id = KB_DRAG; const to = col.dataset.status; $$('.kcol.over').forEach(c => c.classList.remove('over'));
+    const job = get('jobs', id); if (!job || job.status === to) return;
+    try {
+      if (col.classList.contains('nodrop')) { toast(to === 'Closed' ? 'Use “Close job” on the job to close it.' : 'Cannot move a job here.', 'err'); return; }
+      const patch = { status: to }; const S = APP.db.settings;
+      if (to === 'Completed' && S.suggest100OnCompleted && num(job.completionPct) < 100) { const c = await confirmBox({ title: 'Set completion to 100%?', message: `<b>${esc(job.jobNo)}</b> is moving to <b>Completed</b> but completion is ${num(job.completionPct)}%. Update completion to 100%? Choose Cancel to keep ${num(job.completionPct)}%.`, confirm: 'Set to 100%' }); if (c.ok) patch.completionPct = 100; }
+      API.updateJob(id, patch, job.version); toast(`${job.jobNo} → ${to}`); rerender();
+    } catch (err) { showErr(err); }
+  });
 }
 VIEWS.reports = (root, r) => {
   const list = REPORTS.filter(x => can('report_' + x.id));
