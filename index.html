@@ -578,7 +578,7 @@ const TYPE_SLUG = { 'Service': 'service', 'Supply': 'supply', 'Supply/Services':
 const SLUG_TYPE = { service: 'Service', supply: 'Supply', 'supply-services': 'Supply/Services', all: null };
 const INVOICE_STATUSES = ['Uninvoiced', 'Unpaid', 'Partially Paid', 'Paid'];
 const PERMS = [
-  ['viewOverview', 'View Overview tab', 'Tabs'], ['viewJobs', 'View Jobs tab', 'Tabs'], ['viewStatus', 'View Job Status (Kanban) tab', 'Tabs'], ['viewRoster', 'View Roster tab', 'Tabs'],
+  ['viewOverview', 'View Overview tab', 'Tabs'], ['viewJobs', 'View Jobs tab', 'Tabs'], ['viewStatus', 'View Job Status (Kanban) tab', 'Tabs'], ['viewFinance', 'View Finance tab (unbilled jobs, invoice ageing)', 'Tabs'], ['viewRoster', 'View Roster tab', 'Tabs'],
   ['viewMaster', 'View Master Data tab', 'Tabs'], ['viewStores', 'View Stores tab', 'Tabs'], ['viewReports', 'View Reports tab', 'Tabs'], ['viewSettings', 'View Settings tab', 'Tabs'],
   ['jobCreate', 'Create jobs', 'Jobs'], ['quickAddMaster', 'Quick-add companies, end-clients & engineers from the job form', 'Jobs'], ['jobEdit', 'Edit jobs', 'Jobs'], ['jobDelete', 'Archive (delete) jobs', 'Jobs'],
   ['viewFinancials', 'View financial data', 'Finance'], ['editFinancials', 'Edit financial data (PO values)', 'Finance'],
@@ -612,7 +612,7 @@ const PERMS = [
   ['fld_storeCost', 'Field · Store item unit cost & stock value (opening cost, weighted average, receipt cost)', 'Fields'], ['fld_empContact', 'Field · Employee phone & e-mail', 'Fields'], ['fld_partyContact', 'Field · Customer / supplier contact details', 'Fields'], ['fld_creditTerms', 'Field · Credit limit & payment terms', 'Fields'],
 ];
 /* A fine-grained permission a role has never set (older roles, or a role saved before the option existed) inherits its parent. */
-const PERM_PARENT = p => p === 'viewStatus' ? 'viewJobs' : p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p === 'deact_items' ? 'manageStores' : p === 'deact_suppliers' ? ['manageMaster', 'manageStores'] : p.startsWith('deact_') ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
+const PERM_PARENT = p => p === 'viewStatus' ? 'viewJobs' : p === 'viewFinance' ? 'viewFinancials' : p === 'viewStores' ? 'viewMaster' : p === 'manageStores' ? 'manageMaster' : p === 'deact_items' ? 'manageStores' : p === 'deact_suppliers' ? ['manageMaster', 'manageStores'] : p.startsWith('deact_') ? 'manageMaster' : p.startsWith('jobTab_') ? 'viewJobs' : p.startsWith('master_') ? 'viewMaster' : p.startsWith('report_') ? 'viewReports' : p.startsWith('set_') ? 'viewSettings'
   : ['fld_poValue', 'fld_costs', 'fld_margin', 'fld_invoicing'].includes(p) ? 'viewFinancials' : p === 'fld_storeCost' ? ['viewFinancials', 'manageMaster', 'manageStores'] : p === 'fld_empContact' ? ['manageMaster', 'manageUsers', 'rosterAssign'] : p.startsWith('fld_') ? 'viewJobs' : null;
 /* money-type fields are only visible with View financial data, whatever the field switch says */
 const PERM_REQUIRES = { fld_poValue: 'viewFinancials', fld_costs: 'viewFinancials', fld_margin: 'viewFinancials', fld_invoicing: 'viewFinancials', set_users: 'manageUsers' };
@@ -1411,7 +1411,7 @@ const go = (hash) => { if (location.hash === hash) render(); else location.hash 
 const qs = o => { const p = new URLSearchParams(); Object.entries(o).forEach(([k, v]) => { if (v != null && v !== '') p.set(k, v); }); const s = p.toString(); return s ? '?' + s : ''; };
 
 const NAV = [
-  ['overview', 'Overview', 'dashboard', 'viewOverview'], ['jobs', 'Jobs', 'briefcase', 'viewJobs'], ['status', 'Job Status', 'clipboard', 'viewStatus'], ['roster', 'Roster Planner', 'calendar', 'viewRoster'],
+  ['overview', 'Overview', 'dashboard', 'viewOverview'], ['jobs', 'Jobs', 'briefcase', 'viewJobs'], ['status', 'Job Status', 'clipboard', 'viewStatus'], ['finance', 'Finance', 'invoice', 'viewFinance'], ['roster', 'Roster Planner', 'calendar', 'viewRoster'],
   ['master', 'Master Data', 'database', 'viewMaster'], ['stores', 'Stores', 'package', 'viewStores'], ['reports', 'Reports', 'chart-bar', 'viewReports'], ['settings', 'Settings', 'settings', 'viewSettings'],
 ];
 const VIEWS = {};
@@ -3891,6 +3891,84 @@ function repData(R, f) {
   if (totals) cols.forEach((c, i) => { if (c.t === 'pct') { const gp = { plannedGPPct: ['plannedGP', 'plannedPO'], actualGPPct: ['actualGP', 'actualPO'], gpPct: ['actualGP', 'actualPO'], plannedUtil: ['planned', 'capacity'], actualUtil: ['actual', 'capacity'], utilPct: ['totHours', 'planHours'] }[c.k]; if (gp) { const a = sum(rows, r => num(r[gp[0]])), b = sum(rows, r => num(r[gp[1]])); totals[i] = b > 0 ? a / b * 100 : null; } } });
   return { rows, cols, totals };
 }
+/* =============== Finance — unbilled completed jobs, end-client invoice ageing =============== */
+const AGE_B = [['b0', '0–30'], ['b1', '31–60'], ['b2', '61–90'], ['b3', '91–120'], ['b4', '120+']];
+const ageBucket = days => days <= 30 ? 'b0' : days <= 60 ? 'b1' : days <= 90 ? 'b2' : days <= 120 ? 'b3' : 'b4';
+VIEWS.finance = (root, r) => {
+  setCrumbs([['Finance', '#/finance']]);
+  if (!can('viewFinancials')) { root.innerHTML = `<div class="page-head"><div class="t"><h1>Finance</h1></div></div><div class="card empty">${ic('lock')}<b>Financial data hidden</b>Your role does not include “View financial data”.</div>`; return; }
+  const s = vs('fin', { type: '', cust: '', ecl: '', mode: 'any', q: '', aq: '', basis: 'due', open: {} }); const t = todayISO(); const F = k => can('fld_' + k);
+  const base = APP.db.jobs.filter(j => !j.archived && canType(j.type) && (!s.type || j.type === s.type) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl));
+  /* --- 1. completed & closed, not invoiced yet --- */
+  const q = s.q.trim().toLowerCase();
+  const unb = base.filter(j => ['Completed', 'Closed'].includes(j.status)).map(j => { const x = Calc.job(j); const done = j.status === 'Closed' ? (j.closureDate || j.actualFinish || j.pfDate) : (j.actualFinish || j.pfDate); return { j, x, done, unbilled: r2(x.actualPO - x.invoiced), age: done ? dayDiff(done, t) : null }; })
+    .filter(o => o.unbilled > 0.005 && (s.mode === 'any' || o.x.invoiced <= 0.005) && (!q || jobSearchText(o.j).includes(q))).sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+  const ucols = [
+    { k: 'jobNo', label: 'Job no.', fmt: o => `<a class="jobno" href="#/job/${o.j.id}/invoices">${esc(o.j.jobNo)}</a><div class="small faint" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(o.j.description)}">${esc(o.j.description)}</div>`, val: o => o.j.jobNo },
+    ...(F('zohoSo') ? [{ k: 'zohoSo', label: 'Zoho SO #', fmt: o => o.j.zohoSo ? `<span class="mono">${esc(o.j.zohoSo)}</span>` : '<span class="faint">—</span>', val: o => o.j.zohoSo || '' }] : []),
+    { k: 'customer', label: F('endClient') ? 'Company / end-client' : 'Company', fmt: o => `<b style="font-weight:600">${esc(nameOf('customers', o.j.customerId))}</b>${F('endClient') ? `<div class="small faint">${esc(nameOf('endClients', o.j.endClientId) || '—')}</div>` : ''}`, val: o => nameOf('customers', o.j.customerId) },
+    { k: 'status', label: 'Status', fmt: o => `${statusBadge(o.j.status)}${o.j.locked ? ' ' + ic('lock', 'sm') : ''}`, val: o => o.j.status },
+    { k: 'done', label: 'Completed / closed', fmt: o => `<span class="nowrap">${fmtDate(o.done)}</span>${o.age != null ? `<div class="small ${o.age > 30 ? 'ok-r' : 'faint'}">${o.age} day${o.age === 1 ? '' : 's'} ago</div>` : ''}`, val: o => o.done || '' },
+    { k: 'po', label: 'PO value', r: 1, fmt: o => fmtN(o.x.actualPO), val: o => o.x.actualPO },
+    { k: 'inv', label: 'Invoiced', r: 1, fmt: o => o.x.invoiced > 0 ? fmtN(o.x.invoiced) : '<span class="faint">0.00</span>', val: o => o.x.invoiced },
+    { k: 'unbilled', label: 'Not invoiced', r: 1, fmt: o => `<b>${fmtN(o.unbilled)}</b>`, val: o => o.unbilled },
+  ];
+  const us = vs('fin_u', { sort: 'done', dir: 'asc' }); const urows = us.sort ? sortRows(unb, ucols, us.sort, us.dir) : unb;
+  const utot = r2(sum(unb, o => o.unbilled)), upo = r2(sum(unb, o => o.x.actualPO)), uinv = r2(sum(unb, o => o.x.invoiced));
+  /* --- 2. end-client invoice ageing --- */
+  const aq = s.aq.trim().toLowerCase();
+  const pend = base.flatMap(j => L(j.id, 'invoices').map(i => { const o = r2(num(i.amount) - Calc.invPaid(i)); const ref = s.basis === 'due' ? (i.dueDate || i.invoiceDate) : i.invoiceDate; const days = ref ? dayDiff(ref, t) : 0; return { i, j, o, days, b: ageBucket(days), overdue: !!i.dueDate && i.dueDate < t, ecl: j.endClientId || '', eclName: nameOf('endClients', j.endClientId) || 'No end-client' }; }).filter(x => x.o > 0.005));
+  const G = {}; for (const x of pend) { const g = G[x.ecl] ||= { ecl: x.ecl, name: x.eclName, total: 0, n: 0, b0: 0, b1: 0, b2: 0, b3: 0, b4: 0, inv: [] }; g.total = r2(g.total + x.o); g[x.b] = r2(g[x.b] + x.o); g.n++; g.inv.push(x); }
+  let groups = Object.values(G).filter(g => !aq || g.name.toLowerCase().includes(aq) || g.inv.some(x => `${x.i.invoiceNo} ${x.j.jobNo} ${nameOf('customers', x.j.customerId)}`.toLowerCase().includes(aq))).sort((a, b) => b.total - a.total);
+  const atot = { total: r2(sum(groups, g => g.total)), n: sum(groups, g => g.n), ...Object.fromEntries(AGE_B.map(([k]) => [k, r2(sum(groups, g => g[k]))])) };
+  const bcell = (v, k, strong) => `<td class="r nowrap ${(k === 'b4' || k === 'b3') && v > 0 ? 'ok-r' : ''}">${v > 0 ? (strong ? `<b>${fmtN(v)}</b>` : fmtN(v)) : '<span class="faint">·</span>'}</td>`;
+  const ageRows = groups.map(g => { const open = !!s.open[g.ecl || '_none']; const key = g.ecl || '_none';
+    return `<tr class="click tt-row tt-title" data-act="finAge" data-key="${esc(key)}" aria-expanded="${open}" tabindex="0"><td><span style="display:inline-flex;align-items:center;gap:6px">${ic('chevron-right', 'sm chev')}<span><b style="font-weight:600">${esc(g.name)}</b><div class="small faint">${g.n} pending invoice${g.n === 1 ? '' : 's'}${g.inv.some(x => x.overdue) ? ` · ${g.inv.filter(x => x.overdue).length} overdue` : ''}</div></span></span></td><td class="r"><b>${fmtN(g.total)}</b></td>${AGE_B.map(([k]) => bcell(g[k], k)).join('')}</tr>`
+      + (open ? `<tr class="tt-sub" data-parent="${esc(key)}"><td colspan="${2 + AGE_B.length}" style="padding:0 0 0 28px"><table class="dt" style="margin:0"><thead><tr><th>Invoice</th><th>Job no.</th><th>Company</th><th>Invoice date</th><th>Due date</th><th class="r">Amount</th><th class="r">Received</th><th class="r">Outstanding</th><th class="r">Days</th><th>Status</th></tr></thead><tbody>${g.inv.slice().sort((a, b) => b.days - a.days).map(x => `<tr><td class="mono nowrap">${esc(x.i.invoiceNo)}</td><td><a class="jobno" href="#/job/${x.j.id}/invoices">${esc(x.j.jobNo)}</a></td><td>${esc(nameOf('customers', x.j.customerId))}</td><td class="nowrap">${fmtDate(x.i.invoiceDate)}</td><td class="nowrap ${x.overdue ? 'ok-r' : ''}">${fmtDate(x.i.dueDate)}</td><td class="r">${fmtN(x.i.amount)}</td><td class="r">${fmtN(Calc.invPaid(x.i))}</td><td class="r"><b>${fmtN(x.o)}</b></td><td class="r"><span class="badge nodot ${x.b === 'b0' ? 'b-info' : x.b === 'b4' || x.b === 'b3' ? 'b-bad' : 'b-warn'}">${x.days} · ${AGE_B.find(([k]) => k === x.b)[1]}</span></td><td>${invBadge(Calc.invStatus(x.i))}</td></tr>`).join('')}</tbody></table></td></tr>` : ''); }).join('');
+  root.innerHTML = `
+  <div class="page-head"><div class="t"><h1>Finance</h1><p>Jobs that are finished but not billed, and what end-clients still owe · ${esc(APP.db.settings.currency)} · as of ${fmtDate(t)}</p></div>
+    <div class="actions">${can('exportReports') ? `<button class="btn" data-act="finCSV" data-w="unbilled">${ic('download', 'sm')}Unbilled CSV</button><button class="btn" data-act="finCSV" data-w="ageing">${ic('download', 'sm')}Ageing CSV</button>` : ''}<button class="btn" data-act="print">${ic('print', 'sm')}Print / PDF</button></div></div>
+  <div class="filters">
+    <select aria-label="Job type" data-chg="finf" data-k="type">${opt(JOB_TYPES.filter(canType), s.type, 'All job types')}</select>
+    <select aria-label="Company" data-chg="finf" data-k="cust">${opt(custOpts(s.cust), s.cust, 'All companies')}</select>
+    ${F('endClient') ? `<select aria-label="End-client" data-chg="finf" data-k="ecl">${opt(ecOpts(s.ecl), s.ecl, 'All end-clients')}</select>` : ''}
+    ${s.type || s.cust || s.ecl ? `<button class="btn ghost sm" data-act="finReset">Reset</button>` : ''}
+  </div>
+  ${sumStrip([
+    ['Completed / closed, not invoiced', `<b>${unb.length}</b> job${unb.length === 1 ? '' : 's'}`, `${money(utot)} still to invoice`],
+    ['PO value of those jobs', money(upo), `${money(uinv)} already invoiced`],
+    ['Outstanding receivables', money(atot.total), `${atot.n} pending invoice${atot.n === 1 ? '' : 's'} · ${groups.length} end-client${groups.length === 1 ? '' : 's'}`],
+    ['Over 90 days', money(r2(atot.b3 + atot.b4)), atot.total > 0 ? pct((atot.b3 + atot.b4) / atot.total * 100, 1) + ' of outstanding' : '—'],
+  ])}
+  <section class="card" style="margin-bottom:14px"><div class="card-h"><h2>Jobs completed &amp; closed — not invoiced yet <span class="sub">· ${unb.length} job${unb.length === 1 ? '' : 's'} · ${money(utot, { cur: false })} to bill</span></h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="search" style="margin:0"><span class="sr">Search</span>${ic('search', 'sm')}<input type="search" placeholder="Job no., company, SO, description" value="${esc(s.q)}" data-chg="finf" data-k="q" data-focus-key="finq" style="min-width:220px"></label>
+      <div class="seg" role="group" aria-label="Show"><button aria-pressed="${s.mode === 'any'}" data-act="finMode" data-v="any">Any unbilled balance</button><button aria-pressed="${s.mode === 'none'}" data-act="finMode" data-v="none">Not invoiced at all</button></div></div></div>
+    <div class="card-b" style="padding:10px 0 0">${urows.length ? tableHTML({ caption: 'Unbilled completed jobs', view: 'fin_u', sort: us.sort, dir: us.dir, cols: ucols, rows: urows, sticky: false, foot: `<td colspan="${ucols.length - 3}"><b>Total · ${unb.length} job${unb.length === 1 ? '' : 's'}</b></td><td class="r"><b>${fmtN(upo)}</b></td><td class="r"><b>${fmtN(uinv)}</b></td><td class="r"><b>${fmtN(utot)}</b></td>` }) : `<div class="empty" style="padding:22px">${ic('success')}<b>Nothing waiting to be invoiced</b>Every completed or closed job in scope is fully invoiced.</div>`}
+    <p class="small muted" style="padding:10px 16px 14px;margin:0">Completed and Closed jobs whose invoices add up to less than the PO value (cancelled jobs excluded). “Days ago” counts from the actual finish date (or closure date for closed jobs). Click a job number to open its invoices.</p></div></section>
+  <section class="card"><div class="card-h"><h2>End-client invoice ageing <span class="sub">· outstanding ${money(atot.total, { cur: false })} across ${atot.n} invoice${atot.n === 1 ? '' : 's'}</span></h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="search" style="margin:0"><span class="sr">Search</span>${ic('search', 'sm')}<input type="search" placeholder="End-client, invoice, job, company" value="${esc(s.aq)}" data-chg="finf" data-k="aq" data-focus-key="finaq" style="min-width:220px"></label>
+      <div class="seg" role="group" aria-label="Age from"><button aria-pressed="${s.basis === 'due'}" data-act="finBasis" data-v="due" title="Days since the due date (invoice date when no due date)">From due date</button><button aria-pressed="${s.basis === 'inv'}" data-act="finBasis" data-v="inv" title="Days since the invoice date">From invoice date</button></div>
+      <button class="btn ghost sm" data-act="finAgeAll" data-v="${groups.length && groups.every(g => s.open[g.ecl || '_none']) ? '0' : '1'}">${groups.length && groups.every(g => s.open[g.ecl || '_none']) ? 'Collapse all' : 'Expand all'}</button></div></div>
+    <div class="card-b" style="padding:10px 0 0">${groups.length ? `<div class="tbl-wrap"><table class="dt"><caption class="sr">End-client invoice ageing</caption><thead><tr><th scope="col">End-client</th><th class="r" scope="col">Total outstanding</th>${AGE_B.map(([, l]) => `<th class="r" scope="col">${l} days</th>`).join('')}</tr></thead><tbody>${ageRows}</tbody>
+      <tfoot><tr style="font-weight:700"><td>Total · ${groups.length} end-client${groups.length === 1 ? '' : 's'}</td><td class="r">${fmtN(atot.total)}</td>${AGE_B.map(([k]) => bcell(atot[k], k, true)).join('')}</tr></tfoot></table></div>` : `<div class="empty" style="padding:22px">${ic('success')}<b>No pending invoices</b>Every invoice in scope is fully received.</div>`}
+    <p class="small muted" style="padding:10px 16px 14px;margin:0">Outstanding = invoice amount − payments received. Ageing counts days from the invoice due date (or the invoice date when none is set); invoices not yet due sit in 0–30. Click an end-client to list its pending invoices.</p></div></section>`;
+};
+CHG.finf = el => { const s = VS.fin; s[el.dataset.k] = el.value; rerender(); };
+ACT.finReset = () => { Object.assign(VS.fin, { type: '', cust: '', ecl: '' }); rerender(); };
+ACT.finMode = el => { VS.fin.mode = el.dataset.v; rerender(); };
+ACT.finBasis = el => { VS.fin.basis = el.dataset.v; rerender(); };
+ACT.finAge = el => { const k = el.dataset.key; VS.fin.open[k] = !VS.fin.open[k]; rerender(); };
+ACT.finAgeAll = el => { const on = el.dataset.v === '1'; const keys = $$('#view tr[data-act=finAge]').map(tr => tr.dataset.key); VS.fin.open = on ? Object.fromEntries(keys.map(k => [k, true])) : {}; rerender(); };
+ACT.finCSV = el => {
+  const s = VS.fin || {}; const t = todayISO(); const base = APP.db.jobs.filter(j => !j.archived && canType(j.type) && (!s.type || j.type === s.type) && (!s.cust || j.customerId === s.cust) && (!s.ecl || j.endClientId === s.ecl));
+  if (el.dataset.w === 'unbilled') {
+    const rows = base.filter(j => ['Completed', 'Closed'].includes(j.status)).map(j => { const x = Calc.job(j); const done = j.status === 'Closed' ? (j.closureDate || j.actualFinish || j.pfDate) : (j.actualFinish || j.pfDate); return [j.jobNo, j.zohoSo || '', nameOf('customers', j.customerId), nameOf('endClients', j.endClientId), j.status, done || '', done ? dayDiff(done, t) : '', r2(x.actualPO), r2(x.invoiced), r2(x.actualPO - x.invoiced)]; }).filter(r => r[9] > 0.005 && (s.mode === 'any' || r[8] <= 0.005));
+    exportCSV('unbilled-completed-jobs', ['Job no.', 'Zoho SO #', 'Company', 'End-client', 'Status', 'Completed / closed', 'Days ago', 'PO value', 'Invoiced', 'Not invoiced'], rows);
+  } else {
+    const rows = base.flatMap(j => L(j.id, 'invoices').map(i => { const o = r2(num(i.amount) - Calc.invPaid(i)); const ref = s.basis === 'inv' ? i.invoiceDate : (i.dueDate || i.invoiceDate); const d = ref ? dayDiff(ref, t) : 0; return [nameOf('endClients', j.endClientId) || 'No end-client', i.invoiceNo, j.jobNo, nameOf('customers', j.customerId), i.invoiceDate || '', i.dueDate || '', r2(i.amount), Calc.invPaid(i), o, d, AGE_B.find(([k]) => k === ageBucket(d))[1] + ' days', Calc.invStatus(i)]; }).filter(r => r[8] > 0.005)).sort((a, b) => a[0].localeCompare(b[0]) || b[9] - a[9]);
+    exportCSV('end-client-invoice-ageing', ['End-client', 'Invoice', 'Job no.', 'Company', 'Invoice date', 'Due date', 'Amount', 'Received', 'Outstanding', 'Days', 'Bucket', 'Status'], rows);
+  }
+};
 /* =============== Job Status — Kanban board by status =============== */
 VIEWS.status = (root, r) => {
   setCrumbs([['Job Status', '#/status']]);
