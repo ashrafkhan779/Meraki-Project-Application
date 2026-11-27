@@ -391,6 +391,7 @@ details.sec>.sec-b{padding:4px 16px 16px;border-top:1px solid var(--rule);paddin
 .tt-comp td{background:#FAFBFE}.tt-comp td:first-child b{color:var(--accent)}
 .tt-job td{background:#fff}
 
+button.linkish{background:none;border:0;padding:0;font:inherit;font-family:var(--f-num);color:var(--accent);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}button.linkish:hover{text-decoration-style:solid}
 /* Job Status kanban */
 .kanban{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 10px;align-items:flex-start}
 .kcol{flex:0 0 290px;max-width:290px;background:var(--neutral-bg);border-radius:var(--r);display:flex;flex-direction:column;max-height:calc(100vh - 330px);min-height:140px;border:1px solid transparent;transition:border-color var(--t),background var(--t)}
@@ -597,7 +598,7 @@ const PERMS = [
   ['master_inhouse', 'Master · Employees · in-house', 'Master data tabs'], ['master_outsourced', 'Master · Employees · outsourced', 'Master data tabs'],
   ['report_register', 'Report · Job register', 'Reports'], ['report_status', 'Report · Job status', 'Reports'], ['report_pva', 'Report · Planned vs actual cost', 'Reports'], ['report_gp', 'Report · Job-wise GP', 'Reports'],
   ['report_customer', 'Report · Customer-wise profitability', 'Reports'], ['report_endclient', 'Report · End-client-wise profitability', 'Reports'], ['report_supplier', 'Report · Supplier-wise cost', 'Reports'],
-  ['report_manpower', 'Report · Manpower utilisation', 'Reports'], ['report_jobmanpower', 'Report · Job-wise manpower utilisation', 'Reports'], ['report_allocation', 'Report · Employee allocation', 'Reports'], ['report_materials', 'Report · Material cost', 'Reports'], ['report_misc', 'Report · Miscellaneous expenses', 'Reports'],
+  ['report_manpower', 'Report · Manpower utilisation', 'Reports'], ['report_jobmanpower', 'Report · Job-wise manpower utilisation', 'Reports'], ['report_jobcost', 'Report · Job-wise material & manpower cost', 'Reports'], ['report_allocation', 'Report · Employee allocation', 'Reports'], ['report_materials', 'Report · Material cost', 'Reports'], ['report_misc', 'Report · Miscellaneous expenses', 'Reports'],
   ['report_receivables', 'Report · Invoice & receivables', 'Reports'], ['report_closed', 'Report · Closed jobs', 'Reports'], ['report_monthly', 'Report · Monthly financial summary', 'Reports'],
   ['set_general', 'Settings · Company & finance', 'Settings tabs'], ['set_numbering', 'Settings · Job numbering', 'Settings tabs'], ['set_lists', 'Settings · Statuses & categories', 'Settings tabs'], ['set_calendar', 'Settings · Working calendar', 'Settings tabs'],
   ['set_prefs', 'Settings · Notifications, files & export', 'Settings tabs'], ['set_users', 'Settings · Users', 'Settings tabs'], ['set_roles', 'Settings · Roles & permissions', 'Settings tabs'], ['set_audit', 'Settings · Audit log', 'Settings tabs'],
@@ -3834,6 +3835,13 @@ const REPORTS = [
     }, total: true,
   },
   {
+    id: 'jobcost', name: 'Job-wise material & manpower cost', desc: 'Per job: PO value, in-house and outsourced manpower cost, material cost (purchases + store transfers), miscellaneous cost, total actual cost, GP and GP %. Click any amount to see what makes it up. Dates filter the job opening date.', filters: ['date', 'type', 'cust', 'ecl', 'status'], fin: true,
+    cols: [['jobNo', 'Job no.'], ['zohoSo', 'Zoho SO #'], ['customer', 'Company'], ['endClient', 'End-client'], ['status', 'Status'], ['actualPO', 'PO value', 'money'], ['inCost', 'In-house actual cost', 'money'], ['outCost', 'Outsourced actual cost', 'money'], ['matCost', 'Material cost', 'money'], ['miscCost', 'Misc. cost', 'money'], ['actualCost', 'Total actual cost', 'money'], ['actualGP', 'GP', 'money'], ['actualGPPct', 'GP %', 'pct']],
+    rows: f => repJobs(f).filter(j => j.status !== 'Cancelled').map(j => { const x = Calc.job(j); const act = L(j.id, 'actualManpower'); const isOut = l => l.resourceType === 'outsourced' || get('employees', l.employeeId)?.type === 'outsourced';
+      return { _id: j.id, jobNo: j.jobNo, zohoSo: j.zohoSo || '', customer: nameOf('customers', j.customerId), endClient: nameOf('endClients', j.endClientId), status: j.status, actualPO: x.actualPO, inCost: r2(sum(act.filter(l => !isOut(l)), Calc.mp)), outCost: r2(sum(act.filter(isOut), Calc.mp)), matCost: x.actualMaterial, miscCost: x.actualMisc, actualCost: x.actualCost, actualGP: x.actualGP, actualGPPct: x.actualGPPct }; }).sort((a, b) => b.actualCost - a.actualCost), total: true,
+    cell: (c, row) => ({ actualPO: 'po', inCost: 'in', outCost: 'out', matCost: 'mat', miscCost: 'misc', actualCost: 'tot', actualGP: 'gp', actualGPPct: 'gp' }[c.k] ? `<button class="linkish" data-act="jcDetail" data-job="${row._id}" data-w="${({ actualPO: 'po', inCost: 'in', outCost: 'out', matCost: 'mat', miscCost: 'misc', actualCost: 'tot', actualGP: 'gp', actualGPPct: 'gp' })[c.k]}" title="Show what makes up this amount">${repFmt(c, row[c.k])}</button>` : null),
+  },
+  {
     id: 'jobmanpower', name: 'Job-wise manpower utilisation', desc: 'Actual manpower hours and cost per job, split in-house / outsourced, against the planned hours. Dates filter the work dates of the manpower lines; jobs without manpower lines in the range are not listed.', filters: ['date', 'type', 'cust', 'ecl', 'status'], dateNote: 'Work date', fin: true,
     cols: [['jobNo', 'Job no.'], ['zohoSo', 'Zoho SO #'], ['customer', 'Company'], ['endClient', 'End-client'], ['status', 'Status'], ['inHours', 'In-house actual h', 'num'], ['inCost', 'In-house actual cost', 'money'], ['outHours', 'Outsourced actual h', 'num'], ['outCost', 'Outsourced actual cost', 'money'], ['totHours', 'Total actual h', 'num'], ['totCost', 'Total actual cost', 'money'], ['planHours', 'Planned h', 'num'], ['utilPct', 'Actual % of planned', 'pct']],
     rows: f => repJobs({ type: f.type, cust: f.cust, ecl: f.ecl, status: f.status }).map(j => {
@@ -4015,6 +4023,49 @@ VIEWS.status = (root, r) => {
 };
 CHG.kbf = el => { VS.kb[el.dataset.k] = el.value; rerender(); };
 ACT.kbReset = () => { VS.kb = { type: '', cust: '', ecl: '', year: '', q: '' }; rerender(); };
+/* Job-wise cost report: drill-down modal for one amount of one job */
+ACT.jcDetail = el => {
+  const job = get('jobs', el.dataset.job); if (!job) return; const w = el.dataset.w; const x = Calc.job(job); const cur = esc(APP.db.settings.currency);
+  const tbl = (cols, rows, foot) => `<div class="tbl-wrap" style="max-height:60vh"><table class="dt"><thead><tr>${cols.map(c => `<th class="${c.r ? 'r' : ''}">${esc(c.l)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${c.r ? 'r' : ''}">${c.f ? c.f(r) : esc(r[c.k] ?? '')}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="faint" style="text-align:center;padding:18px">Nothing recorded</td></tr>`}</tbody>${foot ? `<tfoot><tr style="font-weight:700">${foot}</tr></tfoot>` : ''}</table></div>`;
+  const dates = l => { const out = new Set(); if (!l.dateFrom) return out; let d = l.dateFrom; const end = l.dateTo && l.dateTo >= l.dateFrom ? l.dateTo : l.dateFrom; for (let i = 0; d <= end && i < 400; i++) { out.add(d); d = addDays(d, 1); } return out; };
+  const isOut = l => l.resourceType === 'outsourced' || get('employees', l.employeeId)?.type === 'outsourced';
+  let title = '', body = '', size = 'wide';
+  if (w === 'in' || w === 'out') {
+    const lines = L(job.id, 'actualManpower').filter(l => isOut(l) === (w === 'out')); const G = {};
+    for (const l of lines) { const e = get('employees', l.employeeId); const k = e ? e.id : 'n:' + (l.resourceName || '?'); const g = G[k] ||= { name: e ? e.name : (l.resourceName || 'Unnamed'), sub: w === 'out' ? (nameOf('suppliers', l.supplierId || e?.supplierId) || '') : (e?.title || ''), hrs: 0, days: new Set(), head: 0, cost: 0, n: 0 }; g.hrs += Calc.mpHours(l); dates(l).forEach(d => g.days.add(d)); g.head = Math.max(g.head, num(l.headcount)); g.cost = r2(g.cost + Calc.mp(l)); g.n++; }
+    const rows = Object.values(G).sort((a, b) => b.cost - a.cost); const tot = r2(sum(rows, r => r.cost));
+    title = `${w === 'in' ? 'In-house' : 'Outsourced'} manpower cost · ${esc(job.jobNo)}`;
+    body = tbl([{ l: w === 'in' ? 'Person / job title' : 'Resource / outsourcing company', f: r => `<b style="font-weight:600">${esc(r.name)}</b>${r.sub ? `<div class="small faint">${esc(r.sub)}</div>` : ''}` }, { l: 'Lines', k: 'n', r: 1 }, { l: 'Headcount', r: 1, f: r => fmtN(r.head, 0) }, { l: 'Days', r: 1, f: r => fmtN(r.days.size, 0) }, { l: 'Hours', r: 1, f: r => fmtN(r.hrs, 1) }, { l: `Cost (${cur})`, r: 1, f: r => `<b>${fmtN(r.cost)}</b>` }, { l: '% of this', r: 1, f: r => tot > 0 ? pct(r.cost / tot * 100, 1) : '—' }], rows,
+      `<td>Total · ${rows.length} ${w === 'in' ? (rows.length === 1 ? 'person' : 'people') : (rows.length === 1 ? 'resource' : 'resources')}</td><td class="r">${sum(rows, r => r.n)}</td><td class="r">${fmtN(sum(rows, r => r.head), 0)}</td><td class="r">${fmtN(new Set(lines.flatMap(l => [...dates(l)])).size, 0)}</td><td class="r">${fmtN(sum(rows, r => r.hrs), 1)}</td><td class="r">${fmtN(tot)}</td><td class="r">100%</td>`)
+      + `<p class="small muted" style="margin:10px 0 0">Days = distinct calendar days with work on them. Cost = headcount × hours/person/day × days × rate per line.</p>`;
+  } else if (w === 'mat') {
+    const lines = [...L(job.id, 'actualMaterials').map(l => ({ name: l.description, uom: l.uom, qty: num(l.qty), cost: Calc.qty(l), src: 'Purchase' })), ...L(job.id, 'inventoryTransfers').filter(t => (t.status || 'Posted') === 'Posted').map(t => { const it = get('inventoryItems', t.itemId); return { name: it ? it.name : 'Store item', uom: t.uom || it?.uom, qty: num(t.qty), cost: Calc.tr(t), src: 'Store' }; })];
+    const M = {}; for (const l of lines) { const k = (l.name || '').trim().toLowerCase() + '|' + (l.uom || '').toUpperCase(); const m = M[k] ||= { name: (l.name || '').trim() || 'Unnamed material', uom: l.uom || '', qty: 0, cost: 0, n: 0, store: 0, buy: 0 }; m.qty = r2(m.qty + l.qty); m.cost = r2(m.cost + l.cost); m.n++; if (l.src === 'Store') m.store++; else m.buy++; }
+    const rows = Object.values(M).sort((a, b) => b.cost - a.cost); const tot = r2(sum(rows, r => r.cost));
+    title = `Material cost · ${esc(job.jobNo)}`;
+    body = tbl([{ l: 'Material', f: r => `<b style="font-weight:600">${esc(r.name)}</b><div class="small faint">${r.n} line${r.n === 1 ? '' : 's'}${r.store ? (r.buy ? ' · purchases + store transfers' : ' · store transfers') : ''}</div>` }, { l: 'Quantity', r: 1, f: r => fmtN(r.qty, 2) }, { l: 'Unit', k: 'uom' }, { l: 'Avg. unit price', r: 1, f: r => r.qty > 0 ? fmtN(r.cost / r.qty, 2) : '—' }, { l: `Total cost (${cur})`, r: 1, f: r => `<b>${fmtN(r.cost)}</b>` }, { l: '% of material', r: 1, f: r => tot > 0 ? pct(r.cost / tot * 100, 1) : '—' }], rows,
+      `<td>Total · ${rows.length} material${rows.length === 1 ? '' : 's'}</td><td></td><td></td><td></td><td class="r">${fmtN(tot)}</td><td class="r">100%</td>`)
+      + `<p class="small muted" style="margin:10px 0 0">Each material appears once — purchases and posted store transfers with the same name and unit are added together. Purchases ${fmtN(x.actualMaterialPurchased)} + store transfers ${fmtN(x.actualMaterialTransfer)} = ${fmtN(x.actualMaterial)}.</p>`;
+  } else if (w === 'misc') {
+    const rows = L(job.id, 'actualMisc').slice().sort((a, b) => num(b.amount) - num(a.amount)); const tot = r2(sum(rows, l => r2(l.amount)));
+    title = `Miscellaneous cost · ${esc(job.jobNo)}`;
+    body = tbl([{ l: 'Category', f: l => `<b style="font-weight:600">${esc(l.category)}</b><div class="small faint">${esc(l.description || '')}</div>` }, { l: 'Vendor / payee', f: l => esc(nameOf('suppliers', l.supplierId) || l.payee || '—') }, { l: 'Date', f: l => `<span class="nowrap">${fmtDate(l.expenseDate)}</span>` }, { l: 'Mode', f: l => esc(l.paymentMode || '—') }, { l: `Amount (${cur})`, r: 1, f: l => `<b>${fmtN(l.amount)}</b>` }, { l: 'Paid', r: 1, f: l => fmtN(Calc.miscPaid(l)) }], rows,
+      `<td>Total · ${rows.length} expense${rows.length === 1 ? '' : 's'}</td><td></td><td></td><td></td><td class="r">${fmtN(tot)}</td><td class="r">${fmtN(sum(rows, Calc.miscPaid))}</td>`);
+  } else if (w === 'po') {
+    const inv = L(job.id, 'invoices'); const rev = L(job.id, 'poRevisions'); const S = APP.db.settings;
+    title = `PO value · ${esc(job.jobNo)}`; size = '';
+    body = `<div class="form-grid"><div class="field s6"><span>Original PO value</span><div><b>${fmtN(x.plannedPO)}</b></div></div><div class="field s6"><span>Actual / revised PO value</span><div><b>${fmtN(x.actualPO)}</b>${S.revenueRule === 'invoiced' ? '<div class="small faint">revenue rule: invoiced amount</div>' : ''}</div></div><div class="field s6"><span>Customer order #</span><div>${esc(job.customerOrderNo || '—')}</div></div><div class="field s6"><span>LPO date</span><div>${fmtDate(job.lpoDate)}</div></div></div>
+      <h3 style="margin:14px 0 6px">Invoices (${inv.length})</h3>${tbl([{ l: 'Invoice', f: i => `<span class="mono">${esc(i.invoiceNo)}</span>` }, { l: 'Date', f: i => fmtDate(i.invoiceDate) }, { l: 'Amount', r: 1, f: i => fmtN(i.amount) }, { l: 'Received', r: 1, f: i => fmtN(Calc.invPaid(i)) }, { l: 'Status', f: i => invBadge(Calc.invStatus(i)) }], inv, `<td>Total</td><td></td><td class="r">${fmtN(x.invoiced)}</td><td class="r">${fmtN(x.paid)}</td><td></td>`)}
+      ${rev.length ? `<h3 style="margin:14px 0 6px">PO revisions</h3><ul class="timeline-list">${rev.map(p => `<li><span class="when">${fmtDT(p.at)}<br>${esc(nameOf('users', p.userId))}</span><span><b>${p.field === 'actualPoValue' ? 'Actual PO' : 'PO value'}</b>: ${fmtN(p.fromValue)} → ${fmtN(p.toValue)}<div class="small muted">${esc(p.reason)}</div></span></li>`).join('')}</ul>` : ''}`;
+  } else {
+    const act = L(job.id, 'actualManpower'); const inC = r2(sum(act.filter(l => !isOut(l)), Calc.mp)), outC = r2(sum(act.filter(isOut), Calc.mp));
+    title = `${w === 'gp' ? 'Gross profit' : 'Total actual cost'} · ${esc(job.jobNo)}`; size = '';
+    const rows = [['PO value', x.actualPO, 'po'], ['In-house manpower', inC, 'in'], ['Outsourced manpower', outC, 'out'], ['Material (purchases + store)', x.actualMaterial, 'mat'], ['Miscellaneous', x.actualMisc, 'misc'], ['Total actual cost', x.actualCost, null, 1], ['Gross profit (GP)', x.actualGP, null, 1], ['GP %', x.actualGPPct, null, 1, 'pct']];
+    body = tbl([{ l: 'Line', f: r => r[3] ? `<b>${esc(r[0])}</b>` : esc(r[0]) }, { l: `Amount (${cur})`, r: 1, f: r => r[4] === 'pct' ? `<b>${pct(r[1], 2)}</b>` : r[2] ? `<button class="linkish" data-act="jcDetail" data-job="${job.id}" data-w="${r[2]}">${fmtN(r[1])}</button>` : `<b>${fmtN(r[1])}</b>` }, { l: '% of PO', r: 1, f: r => r[4] === 'pct' || x.actualPO <= 0 ? '' : pct(r[1] / x.actualPO * 100, 1) }], rows)
+      + `<p class="small muted" style="margin:10px 0 0">GP = PO value − total actual cost · GP % = GP ÷ PO value × 100. Click an amount for its breakdown.${!x.hasActuals ? ' <b>No actual costs recorded yet.</b>' : ''}</p>`;
+  }
+  modal({ title: `${title}<div class="small muted" style="font-weight:400">${esc(job.description || '')} · ${esc(nameOf('customers', job.customerId))}</div>`, size, body, foot: `<a class="btn" href="#/job/${job.id}/financials" data-close>Open job</a><button class="btn primary" data-close type="button">Close</button>` });
+};
 let KB_BOUND = false, KB_DRAG = null;
 function bindKanban() {
   if (KB_BOUND) return; KB_BOUND = true;
@@ -4046,7 +4097,7 @@ VIEWS.reports = (root, r) => {
   const f = vs('rep_' + R.id, Object.assign({ from: '', to: '', type: '', cust: '', ecl: '', sup: '', emp: '', status: '', inv: '', etype: '' }, R.defaults ? R.defaults() : {}));
   const { rows, cols, totals } = repData(R, f);
   const s = vs('rv_' + R.id, { sort: '', dir: 'desc', page: 1, size: 50 });
-  const tcols = cols.map(c => ({ k: c.k, label: c.label, r: ['money', 'num', 'int', 'pct'].includes(c.t), val: r => r[c.k], fmt: row => c.k === 'jobNo' && row._id ? `<a class="jobno" href="#/job/${row._id}">${esc(row.jobNo)}</a>` : c.k === 'status' && STATUS_CLS[row.status] ? statusBadge(row.status) : (c.k.endsWith('Variance') && c.t === 'money') ? varHTML(row[c.k], c.k === 'costVariance') : repFmt(c, row[c.k]) }));
+  const tcols = cols.map(c => ({ k: c.k, label: c.label, r: ['money', 'num', 'int', 'pct'].includes(c.t), val: r => r[c.k], fmt: row => (R.cell && R.cell(c, row)) ?? (c.k === 'jobNo' && row._id ? `<a class="jobno" href="#/job/${row._id}">${esc(row.jobNo)}</a>` : c.k === 'status' && STATUS_CLS[row.status] ? statusBadge(row.status) : (c.k.endsWith('Variance') && c.t === 'money') ? varHTML(row[c.k], c.k === 'costVariance') : repFmt(c, row[c.k])) }));
   const sorted = s.sort ? sortRows(rows, tcols, s.sort, s.dir) : rows; const pages = Math.max(1, Math.ceil(sorted.length / s.size)); s.page = Math.min(s.page, pages);
   const fl = R.filters; const sel = (k, list, ph) => `<select aria-label="${ph}" data-chg="rf" data-r="${R.id}" data-k="${k}">${opt(list, f[k], ph)}</select>`;
   root.innerHTML = `<div class="page-head"><div class="t"><h1>${esc(R.name)}</h1><p>${esc(R.desc)}${R.fin && !can('viewFinancials') ? ' <b>Financial columns are hidden for your role.</b>' : ''}</p></div>
